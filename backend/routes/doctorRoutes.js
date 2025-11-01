@@ -1,9 +1,24 @@
-const express = require('express');
+import express from 'express';
+import {
+	listDoctors,
+	createDoctor,
+	updateCurrentToken,
+	getTodaysPatients,
+	markConsultationCompleted,
+} from '../controllers/doctorController.js';
+
 const router = express.Router();
-const doctorController = require('../controllers/doctorController');
 
-// Example doctor routes
-router.get('/', doctorController.listDoctors);
-router.post('/', doctorController.createDoctor);
+router.get('/', listDoctors);
+router.post('/', createDoctor);
 
-module.exports = router;
+// Receptionist/Admin: update current token for a doctor
+router.put('/:id/token', updateCurrentToken);
+
+// Doctor: get today's patient list
+router.get('/:id/patients', getTodaysPatients);
+
+// Mark consultation completed (appointment id)
+router.put('/appointments/:id/complete', markConsultationCompleted);
+
+export default router;

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { auth } from '../services/api';
+import api from '../services/api';
+import { useSocket } from '../services/socket';
 import Layout from '../components/Layout';
 import {
   Typography,
@@ -20,6 +22,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [validation, setValidation] = useState({ email: '', password: '' });
+  const { connect } = useSocket();
 
   const validateForm = () => {
     const newValidation = { email: '', password: '' };
@@ -64,6 +67,19 @@ const Login = () => {
     try {
       const res = await auth.login(form);
       if (res.data) {
+        const { token, user } = res.data;
+        // Save token and user locally
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        // set default auth header for future API calls
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        // connect socket and join user room
+        try {
+          connect(user.user_id);
+        } catch (err) {
+          // ignore socket errors
+        }
+
         navigate('/');
       }
     } catch (err) {

@@ -1,54 +1,134 @@
 import React, { useState } from "react";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Box,
+  Alert,
+  Link,
+  CircularProgress,
+  LinearProgress
+} from "@mui/material";
+import Layout from '../components/Layout';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login } = useAuth();
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Get the redirect path if it exists
+  const from = location.state?.from?.pathname || "/dashboard";
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
+
     try {
-      const res = await axios.post("http://localhost:3000/api/auth/login", {
-        email,
-        password,
-      });
-      alert("Login successful!");
-      localStorage.setItem("token", res.data.token);
-      navigate("/");
+      await login(formData.email, formData.password);
+      navigate(from, { replace: true });
     } catch (err) {
-      alert("Invalid credentials!");
+      setError(
+        err.response?.data?.message || 
+        "Failed to login. Please check your credentials."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-50">
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-8 rounded-lg shadow-lg w-96"
-      >
-        <h2 className="text-2xl font-bold text-center mb-6 text-blue-600">
-          Login
-        </h2>
-        <input
-          type="email"
-          placeholder="Email"
-          className="border w-full p-2 mb-4 rounded"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          className="border w-full p-2 mb-4 rounded"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button className="bg-blue-500 text-white px-4 py-2 w-full rounded hover:bg-blue-600">
-          Login
-        </button>
-      </form>
-    </div>
+    <Layout>
+      <Box className="max-w-md mx-auto mt-8 px-4">
+        {loading && <LinearProgress className="fixed top-0 left-0 w-full" />}
+        <Paper elevation={3} className="p-8">
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}>
+            <Box sx={{
+              m: 1,
+              bgcolor: 'secondary.main',
+              p: 2,
+              borderRadius: '50%',
+              display: 'flex',
+              justifyContent: 'center',
+            }}>
+              <LockOutlinedIcon className="text-white" />
+            </Box>
+
+            <Typography component="h1" variant="h5" className="mb-4">
+              Sign in to HospEase
+            </Typography>
+
+            {error && (
+              <Alert severity="error" className="mb-4 w-full">
+                {error}
+              </Alert>
+            )}
+
+            <Box component="form" onSubmit={handleLogin} className="w-full space-y-4">
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="email"
+                label="Email Address"
+                name="email"
+                autoComplete="email"
+                autoFocus
+                value={formData.email}
+                onChange={handleChange}
+                disabled={loading}
+              />
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                name="password"
+                label="Password"
+                type="password"
+                id="password"
+                autoComplete="current-password"
+                value={formData.password}
+                onChange={handleChange}
+                disabled={loading}
+              />
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                disabled={loading}
+                className="mt-4 py-3"
+              >
+                {loading ? (
+                  <CircularProgress size={24} className="text-white" />
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+              <Box className="mt-4 text-center">
+                <Link component={RouterLink} to="/register" variant="body2">
+                  {"Don't have an account? Sign Up"}
+                </Link>
+              </Box>
+            </Box>
+          </Box>
+        </Paper>
+      </Box>
+    </Layout>
   );
 }

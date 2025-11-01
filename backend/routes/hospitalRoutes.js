@@ -1,9 +1,9 @@
-const express = require('express');
+import express from 'express';
+import { listHospitals, createHospital } from '../controllers/hospitalController.js';
+
 const router = express.Router();
-const hospitalController = require('../controllers/hospitalController');
 
-// Example hospital routes
-router.get('/', hospitalController.listHospitals);
-router.post('/', hospitalController.createHospital);
+router.get('/', listHospitals);
+router.post('/', createHospital);
 
-module.exports = router;
+export default router;

@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Frontend will call backend through proxy at port 3000 during development
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
 
 const api = axios.create({
   baseURL,
@@ -9,6 +10,45 @@ const api = axios.create({
   },
   withCredentials: true,
 });
+
+// Add response interceptors for handling auth errors and token refresh
+api.interceptors.response.use(
+  (response) => {
+    // Check for new token in response header
+    const newToken = response.headers['x-new-token'];
+    if (newToken) {
+      localStorage.setItem('token', newToken);
+      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+    }
+    return response;
+  },
+  (error) => {
+    // Handle authentication errors
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      const currentPath = window.location.pathname;
+      const isAuthPath = currentPath === '/login' || currentPath === '/register';
+      
+      // Clear auth data
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      delete api.defaults.headers.common['Authorization'];
+      
+      // Only redirect if not already on an auth page and not a token verification request
+      if (!isAuthPath && !error.config.url.includes('/api/auth/verify')) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// If a token is present in localStorage, set default Authorization header
+if (typeof window !== 'undefined') {
+  const token = localStorage.getItem('token');
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  }
+}
 
 export const auth = {
   register: (data) => api.post('/api/auth/register', data),
@@ -25,13 +65,33 @@ export const hospitals = {
 export const doctors = {
   list: () => api.get('/api/doctors'),
   create: (data) => api.post('/api/doctors', data),
-  get: (id) => api.get(`/api/doctors/${id}`)
+  get: (id) => api.get(`/api/doctors/${id}`),
+  updateToken: (id, data) => api.put(`/api/doctors/${id}/token`, data),
 };
 
 export const appointments = {
   list: () => api.get('/api/appointments'),
   create: (data) => api.post('/api/appointments', data),
-  get: (id) => api.get(`/api/appointments/${id}`)
+  get: (id) => api.get(`/api/appointments/${id}`),
+};
+
+export const patients = {
+  list: () => api.get('/api/patients'),
+  create: (data) => api.post('/api/patients', data),
+  get: (id) => api.get(`/api/patients/${id}`),
+  update: (id, data) => api.put(`/api/patients/${id}`, data),
+  remove: (id) => api.delete(`/api/patients/${id}`),
+};
+
+export const wards = {
+  list: () => api.get('/api/wards'),
+  get: (id) => api.get(`/api/wards/${id}`),
+  updateBed: (wardId, bedId, data) => api.put(`/api/wards/${wardId}/beds/${bedId}`, data),
+};
+
+export const billing = {
+  createInvoice: (data) => api.post('/api/billing', data),
+  getInvoices: () => api.get('/api/billing'),
 };
 
 export default api;

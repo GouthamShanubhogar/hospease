@@ -1,49 +1,135 @@
-import React, { useEffect, useState } from 'react';
-import { hospitals } from '../services/api';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Typography from '@mui/material/Typography';
-import Grid from '@mui/material/Grid';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Grid,
+  Paper,
+  Alert,
+  Button,
+  CircularProgress
+} from '@mui/material';
+import { Add as AddIcon } from '@mui/icons-material';
 import Layout from '../components/Layout';
+import { useAuth } from '../contexts/AuthContext';
+import api from '../services/api';
+import HospitalCard from '../components/hospitals/HospitalCard';
+import HospitalDetailsDialog from '../components/hospitals/HospitalDetailsDialog';
 
 const HospitalsPage = () => {
-  const [list, setList] = useState([]);
+  const [hospitals, setHospitals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedHospital, setSelectedHospital] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const canManage = user?.role === 'admin' || user?.role === 'staff';
 
   useEffect(() => {
     let mounted = true;
-    hospitals.list()
-      .then(res => {
-        if (mounted) setList(res.data || []);
-      })
-      .catch(err => setError(err.message || 'Failed to load'))
-      .finally(() => mounted && setLoading(false));
+    const fetchHospitals = async () => {
+      try {
+        const response = await api.get('/api/hospitals');
+        if (mounted) {
+          setHospitals(response.data || []);
+        }
+      } catch (err) {
+        if (mounted) {
+          setError(err.message || 'Failed to load hospitals');
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
 
+    fetchHospitals();
     return () => (mounted = false);
   }, []);
 
+  const handleEdit = (hospital) => {
+    navigate(`/hospitals/edit/${hospital.id}`);
+  };
+
+  const handleDelete = async (hospitalId) => {
+    if (window.confirm('Are you sure you want to delete this hospital?')) {
+      try {
+        await api.delete(`/api/hospitals/${hospitalId}`);
+        setHospitals(hospitals.filter(h => h.id !== hospitalId));
+      } catch (err) {
+        setError('Failed to delete hospital');
+      }
+    }
+  };
+
+  const handleViewDetails = (hospital) => {
+    setSelectedHospital(hospital);
+    setDetailsOpen(true);
+  };
+
   return (
     <Layout>
-      <div className="py-6">
-        <Typography variant="h4" gutterBottom className="mb-4">Hospitals</Typography>
+      <Box className="py-6">
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+          <Typography variant="h4">Hospitals</Typography>
+          {canManage && (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => navigate('/hospitals/new')}
+              startIcon={<AddIcon />}
+            >
+              Add Hospital
+            </Button>
+          )}
+        </Box>
 
-        {loading && <div>Loading...</div>}
-        {error && <div className="text-red-600">{error}</div>}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
 
-        <Grid container spacing={2}>
-          {list.map((h) => (
-            <Grid item xs={12} sm={6} md={4} key={h.id || h._id}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6">{h.name}</Typography>
-                  <Typography variant="body2" color="text.secondary">{h.address}</Typography>
-                </CardContent>
-              </Card>
+        <Grid container spacing={3}>
+          {loading ? (
+            Array.from(new Array(6)).map((_, index) => (
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <HospitalCard loading={true} />
+              </Grid>
+            ))
+          ) : (
+            hospitals.map((hospital) => (
+              <Grid item xs={12} sm={6} md={4} key={hospital.id}>
+                <HospitalCard
+                  hospital={hospital}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onViewDetails={handleViewDetails}
+                  canManage={canManage}
+                />
+              </Grid>
+            ))
+          )}
+          {!loading && hospitals.length === 0 && (
+            <Grid item xs={12}>
+              <Paper sx={{ p: 3, textAlign: 'center' }}>
+                <Typography color="textSecondary">
+                  No hospitals found
+                </Typography>
+              </Paper>
             </Grid>
-          ))}
+          )}
         </Grid>
-      </div>
+
+        <HospitalDetailsDialog
+          open={detailsOpen}
+          onClose={() => setDetailsOpen(false)}
+          hospital={selectedHospital}
+        />
+      </Box>
     </Layout>
   );
 };
