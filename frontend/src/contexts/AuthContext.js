@@ -42,10 +42,12 @@ export const AuthProvider = ({ children }) => {
             throw new Error('Token verification failed');
           }
         } catch (err) {
-          // Token invalid/expired
+          console.error('Auth initialization error:', err);
+          // Token invalid/expired - clear auth data
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           delete api.defaults.headers.common['Authorization'];
+          setUser(null);
         }
       }
       

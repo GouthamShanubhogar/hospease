@@ -9,6 +9,7 @@ import userRoutes from "./routes/userRoutes.js";
 import hospitalRoutes from "./routes/hospitalRoutes.js";
 import doctorRoutes from "./routes/doctorRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
+import departmentRoutes from './routes/departmentRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -16,9 +17,22 @@ dotenv.config();
 // Initialize express app
 const app = express();
 
-// CORS Configuration
+// CORS Configuration - Allow multiple frontend ports
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -60,7 +74,7 @@ const server = http.createServer(app);
 
 const io = new IOServer(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   }

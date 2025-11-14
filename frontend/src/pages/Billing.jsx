@@ -1,61 +1,204 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
-import ModalForm from '../components/ModalForm';
 import api from '../services/api';
 
 const Billing = () => {
-  const [items, setItems] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [line, setLine] = useState({ description: '', qty: 1, price: 0 });
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
 
-  const addLine = () => {
-    setItems(prev => [...prev, { ...line, id: Date.now() }]);
-    setLine({ description: '', qty: 1, price: 0 });
-  };
+  useEffect(() => {
+    let mounted = true;
+    api.get('/api/billing')
+      .then(res => {
+        if (!mounted) return;
+        setInvoices(res.data || [
+          { 
+            id: 1, 
+            invoiceNumber: 'INV-2024-001', 
+            date: 'December 15, 2024', 
+            dueDate: 'December 30, 2024',
+            patientName: 'John Doe',
+            patientId: 'PAT-12345',
+            room: '204 - ICU',
+            services: [
+              { description: 'Room Charges (ICU)', quantity: 3, unitPrice: 500, amount: 1500 },
+              { description: 'Consultation Fee', quantity: 2, unitPrice: 150, amount: 300 },
+              { description: 'Laboratory Tests', quantity: 5, unitPrice: 80, amount: 400 },
+              { description: 'Medications', quantity: 1, unitPrice: 250, amount: 250 },
+              { description: 'Surgery', quantity: 1, unitPrice: 3000, amount: 3000 },
+            ],
+            subtotal: 5450,
+            tax: 545,
+            total: 5995,
+            status: 'Pending'
+          }
+        ]);
+      })
+      .catch(() => {})
+      .finally(() => mounted && setLoading(false));
+    return () => (mounted = false);
+  }, []);
 
-  const total = items.reduce((s, it) => s + (it.qty * Number(it.price || 0)), 0);
-
-  const handleGenerate = async () => {
-    try {
-      await api.post('/api/billing', { items, total });
-      setItems([]);
-      alert('Invoice generated');
-    } catch (err) { console.error(err); }
+  const handleViewInvoice = (invoice) => {
+    setSelectedInvoice(invoice);
+    setShowModal(true);
   };
 
   return (
     <Layout>
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Billing</h2>
-          <div>
-            <button onClick={() => setOpen(true)} className="px-4 py-2 bg-blue-600 text-white rounded-md">Add Charge</button>
-            <button onClick={handleGenerate} className="ml-2 px-4 py-2 bg-green-600 text-white rounded-md">Generate Invoice</button>
-          </div>
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Billing & Invoices</h1>
+          <button 
+            onClick={() => handleViewInvoice(invoices[0])}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            <span>📄</span> Generate Invoice
+          </button>
         </div>
 
-        <div className="bg-white p-4 rounded shadow">
-          <h3 className="font-medium mb-2">Invoice Preview</h3>
-          <div className="space-y-2">
-            {items.map(it => (
-              <div key={it.id} className="flex justify-between border-b pb-1">
-                <div>{it.description} x{it.qty}</div>
-                <div>${(it.qty * it.price).toFixed(2)}</div>
+        {/* Invoice Preview */}
+        {invoices.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-8">
+            <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-gray-200">
+              <div>
+                <h2 className="text-4xl font-bold text-blue-600 mb-2">INVOICE</h2>
+                <p className="text-gray-600">Hospease Hospital</p>
               </div>
-            ))}
-          </div>
+              <div className="text-right text-sm text-gray-600">
+                <p><strong>Invoice #:</strong> {invoices[0].invoiceNumber}</p>
+                <p><strong>Date:</strong> {invoices[0].date}</p>
+                <p><strong>Due Date:</strong> {invoices[0].dueDate}</p>
+              </div>
+            </div>
 
-          <div className="mt-4 text-right font-semibold">Total: ${total.toFixed(2)}</div>
-        </div>
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Patient Information</h3>
+              <p className="text-gray-700"><strong>Name:</strong> {invoices[0].patientName}</p>
+              <p className="text-gray-700"><strong>Patient ID:</strong> {invoices[0].patientId}</p>
+              <p className="text-gray-700"><strong>Room:</strong> {invoices[0].room}</p>
+            </div>
 
-        <ModalForm open={open} title="Add Charge" onClose={() => setOpen(false)} onSave={() => { addLine(); setOpen(false); }}>
-          <div className="grid grid-cols-1 gap-3">
-            <input className="p-2 border rounded" placeholder="Description" value={line.description} onChange={(e) => setLine(l => ({ ...l, description: e.target.value }))} />
-            <input className="p-2 border rounded" type="number" placeholder="Qty" value={line.qty} onChange={(e) => setLine(l => ({ ...l, qty: Number(e.target.value) }))} />
-            <input className="p-2 border rounded" type="number" placeholder="Price" value={line.price} onChange={(e) => setLine(l => ({ ...l, price: Number(e.target.value) }))} />
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Services & Charges</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Description</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Quantity</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Unit Price</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {invoices[0].services.map((service, index) => (
+                      <tr key={index}>
+                        <td className="px-6 py-4 text-sm text-gray-900">{service.description}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">{service.quantity} {service.quantity > 1 ? 'days' : 'day'}</td>
+                        <td className="px-6 py-4 text-sm text-gray-600">${service.unitPrice}</td>
+                        <td className="px-6 py-4 text-sm font-semibold text-gray-900">${service.amount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-gray-700">Subtotal:</span>
+                <span className="text-gray-900 font-semibold">${invoices[0].subtotal}</span>
+              </div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-gray-700">Tax (10%):</span>
+                <span className="text-gray-900 font-semibold">${invoices[0].tax}</span>
+              </div>
+              <div className="flex items-center justify-between pt-4 border-t-2 border-gray-200">
+                <span className="text-2xl font-bold text-blue-600">Total Amount:</span>
+                <span className="text-2xl font-bold text-blue-600">${invoices[0].total}</span>
+              </div>
+            </div>
           </div>
-        </ModalForm>
+        )}
       </div>
+
+      {/* Invoice Modal */}
+      {showModal && selectedInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Invoice Details</h2>
+              <button 
+                onClick={() => setShowModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-3xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div className="flex items-start justify-between pb-6 border-b border-gray-200">
+                <div>
+                  <h3 className="text-3xl font-bold text-blue-600 mb-2">INVOICE</h3>
+                  <p className="text-gray-600">Hospease Hospital</p>
+                </div>
+                <div className="text-right text-sm text-gray-600">
+                  <p><strong>Invoice #:</strong> {selectedInvoice.invoiceNumber}</p>
+                  <p><strong>Date:</strong> {selectedInvoice.date}</p>
+                  <p><strong>Due Date:</strong> {selectedInvoice.dueDate}</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-2">Patient Information</h4>
+                <p className="text-gray-700"><strong>Name:</strong> {selectedInvoice.patientName}</p>
+                <p className="text-gray-700"><strong>Patient ID:</strong> {selectedInvoice.patientId}</p>
+                <p className="text-gray-700"><strong>Room:</strong> {selectedInvoice.room}</p>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-2">Services</h4>
+                <div className="space-y-2">
+                  {selectedInvoice.services.map((service, index) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span className="text-gray-700">{service.description}</span>
+                      <span className="font-semibold text-gray-900">${service.amount}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex justify-between mb-2">
+                  <span>Subtotal:</span>
+                  <span className="font-semibold">${selectedInvoice.subtotal}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span>Tax (10%):</span>
+                  <span className="font-semibold">${selectedInvoice.tax}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-200">
+                  <span className="text-lg font-bold text-blue-600">Total:</span>
+                  <span className="text-lg font-bold text-blue-600">${selectedInvoice.total}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-semibold">
+                  Print Invoice
+                </button>
+                <button className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all duration-200 font-semibold">
+                  Download PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

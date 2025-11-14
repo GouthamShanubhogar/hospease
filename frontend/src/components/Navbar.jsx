@@ -1,92 +1,65 @@
 import React from 'react';
-import AppBar from '@mui/material/AppBar';
-import Toolbar from '@mui/material/Toolbar';
-import Typography from '@mui/material/Typography';
-import Button from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import MenuIcon from '@mui/icons-material/Menu';
-import Avatar from '@mui/material/Avatar';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import { Link } from 'react-router-dom';
-import NotificationBell from './NotificationBell';
+import { Link, useLocation } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faHospital, faBell, faUser, faCog } from '@fortawesome/free-solid-svg-icons';
 import { useAuth } from '../contexts/AuthContext';
 
 const Navbar = () => {
-  const { user, logout, hasRole } = useAuth();
-  const [anchorEl, setAnchorEl] = React.useState(null);
+  const { user, logout } = useAuth();
+  const location = useLocation();
 
-  const handleMenuClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = () => {
-    handleMenuClose();
-    logout();
-  };
+  const navLinks = [
+    { name: 'Dashboard', path: '/dashboard' },
+    { name: 'Patient Records', path: '/patients' },
+    { name: 'Doctor Profiles', path: '/doctors' },
+    { name: 'Appointments', path: '/appointments' },
+    { name: 'Billing', path: '/billing' },
+  ];
 
   return (
-    <AppBar position="static" color="transparent" elevation={0}>
-      <Toolbar className="max-w-7xl mx-auto px-4">
-        <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }}>
-          <MenuIcon />
-        </IconButton>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }} className="font-semibold text-gray-900">
-          <Link to="/">HospEase</Link>
-        </Typography>
-        <div className="space-x-2 flex items-center">
-          {user ? (
-            <>
-              <Button component={Link} to="/dashboard" variant="text">Dashboard</Button>
-              <Button component={Link} to="/hospitals" variant="text">Hospitals</Button>
-              {hasRole(['admin', 'doctor', 'staff']) && (
-                <Button component={Link} to="/patients" variant="text">Patients</Button>
-              )}
-              {hasRole(['admin', 'staff']) && (
-                <>
-                  <Button component={Link} to="/doctors" variant="text">Doctors</Button>
-                  <Button component={Link} to="/wards" variant="text">Wards</Button>
-                  <Button component={Link} to="/billing" variant="text">Billing</Button>
-                  <Button component={Link} to="/reception" variant="text">Reception</Button>
-                </>
-              )}
-              <Button component={Link} to="/appointments" variant="text">Appointments</Button>
-              <NotificationBell />
-              
-              <IconButton onClick={handleMenuClick}>
-                <Avatar sx={{ width: 32, height: 32 }}>
-                  {user.name ? user.name[0].toUpperCase() : '?'}
-                </Avatar>
-              </IconButton>
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <FontAwesomeIcon icon={faHospital} className="text-black text-xl" />
+            <span className="text-lg font-normal text-black">Hospease</span>
+          </Link>
+
+          {/* Navigation Links */}
+          <div className="hidden md:flex items-center space-x-8">
+            {navLinks.map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`text-sm ${
+                  location.pathname === link.path
+                    ? 'text-blue-600 font-medium'
+                    : 'text-gray-700 hover:text-blue-600'
+                } transition-colors`}
               >
-                <MenuItem disabled>
-                  <Typography variant="body2" color="textSecondary">
-                    Signed in as {user.name}
-                  </Typography>
-                </MenuItem>
-                <MenuItem component={Link} to="/profile" onClick={handleMenuClose}>Profile</MenuItem>
-                <MenuItem onClick={handleLogout}>Logout</MenuItem>
-              </Menu>
-            </>
-          ) : (
-            <>
-              <Button component={Link} to="/login" variant="contained" color="primary">Login</Button>
-              <Button component={Link} to="/register" variant="outlined">Register</Button>
-            </>
-          )}
+                {link.name}
+              </Link>
+            ))}
+          </div>
+
+          {/* Right Side Icons */}
+          <div className="flex items-center gap-4">
+            <button className="text-gray-600 hover:text-gray-800">
+              <FontAwesomeIcon icon={faBell} className="text-lg" />
+            </button>
+            <button className="text-gray-600 hover:text-gray-800">
+              <FontAwesomeIcon icon={faCog} className="text-lg" />
+            </button>
+            <button className="flex items-center gap-2 text-gray-700 hover:text-gray-900">
+              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                <FontAwesomeIcon icon={faUser} className="text-sm text-gray-600" />
+              </div>
+            </button>
+          </div>
         </div>
-      </Toolbar>
-    </AppBar>
+      </div>
+    </nav>
   );
 };
 

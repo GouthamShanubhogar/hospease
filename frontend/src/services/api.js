@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Frontend will call backend through proxy at port 3000 during development
-const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+// Frontend will call backend through proxy at port 5000 during development
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const api = axios.create({
   baseURL,
@@ -26,16 +26,20 @@ api.interceptors.response.use(
     // Handle authentication errors
     if (error.response?.status === 401 || error.response?.status === 403) {
       const currentPath = window.location.pathname;
-      const isAuthPath = currentPath === '/login' || currentPath === '/register';
+      const isAuthPath = currentPath === '/login' || currentPath === '/register' || currentPath === '/';
+      const isVerifyRequest = error.config?.url?.includes('/api/auth/verify');
       
-      // Clear auth data
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      delete api.defaults.headers.common['Authorization'];
-      
-      // Only redirect if not already on an auth page and not a token verification request
-      if (!isAuthPath && !error.config.url.includes('/api/auth/verify')) {
-        window.location.href = '/login';
+      // Don't redirect on verify requests - let AuthContext handle it
+      if (!isVerifyRequest) {
+        // Clear auth data
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        delete api.defaults.headers.common['Authorization'];
+        
+        // Only redirect if not already on an auth page
+        if (!isAuthPath) {
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

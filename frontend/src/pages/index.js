@@ -1,6 +1,10 @@
-export { default as Home } from './home';
-export { default as Login } from './login';
-export { default as Register } from './Register';
-export { default as Hospitals } from './hospitals';
-export { default as Doctors } from './doctors';
-export { default as Appointments } from './appointments';
+export { default as Home } from './home.jsx';
+export { default as Login } from './login.jsx';
+export { default as Register } from './Register.jsx';
+export { default as Dashboard } from './Dashboard.jsx';
+export { default as Doctors } from './Doctors.jsx';
+export { default as Appointments } from './Appointments.jsx';
+export { default as Patients } from './Patients.jsx';
+export { default as Wards } from './Wards.jsx';
+export { default as Billing } from './Billing.jsx';
+export { default as Profile } from './profile.jsx';
