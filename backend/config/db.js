@@ -12,7 +12,7 @@ const pool = new Pool({
   port: process.env.PG_PORT,
 });
 
-pool.connect()
+pool.query('SELECT NOW()')
   .then(() => console.log("✅ PostgreSQL connected successfully"))
   .catch((err) => console.error("❌ PostgreSQL connection error:", err));
 

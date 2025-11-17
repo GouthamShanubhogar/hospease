@@ -45,7 +45,7 @@ export const registerUser = async (req, res) => {
     const newUser = await pool.query(
       `INSERT INTO users (name, email, password, phone, role)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING user_id, name, email, role`,
+       RETURNING id, name, email, role`,
       [name, email, hashedPassword, phone || null, role || "patient"]
     );
 
@@ -107,7 +107,7 @@ export const loginUser = async (req, res) => {
 
     // Generate JWT Token
     const token = jwt.sign(
-      { user_id: user.user_id, role: user.role },
+      { user_id: user.id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -117,7 +117,7 @@ export const loginUser = async (req, res) => {
       message: "Login successful",
       token,
       user: {
-        user_id: user.user_id,
+        user_id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,

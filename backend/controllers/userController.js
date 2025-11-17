@@ -7,7 +7,7 @@ export const getProfile = async (req, res) => {
     if (!userId) return res.status(400).json({ status: 'error', message: 'User id missing' });
 
     const result = await pool.query(
-      'SELECT user_id, name, email, phone, role FROM users WHERE user_id = $1',
+      'SELECT id, name, email, phone, role FROM users WHERE id = $1',
       [userId]
     );
 
@@ -51,7 +51,7 @@ export const updateProfile = async (req, res) => {
     }
 
     values.push(userId);
-    const query = `UPDATE users SET ${updates.join(', ')} WHERE user_id = $${idx} RETURNING user_id, name, email, phone, role`;
+    const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${idx} RETURNING id, name, email, phone, role`;
 
     const result = await pool.query(query, values);
     res.json({ status: 'success', user: result.rows[0] });

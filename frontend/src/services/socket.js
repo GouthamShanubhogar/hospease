@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 import { createContext, useContext, useEffect, useState } from 'react';
 
-const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 let socket = null;
 
 // Socket singleton to prevent multiple connections
@@ -10,6 +10,11 @@ export const getSocket = () => {
     socket = io(baseURL, { 
       withCredentials: true,
       autoConnect: false, // Don't connect automatically
+      transports: ['websocket', 'polling'], // Prefer websocket, fallback to polling
+      upgrade: false, // Disable transport upgrade to prevent 400 errors
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5,
     });
   }
   return socket;
@@ -80,16 +85,89 @@ export const SocketProvider = ({ children }) => {
       }, ...prev]);
     };
 
+    const onAppointmentCreated = (data) => {
+      setNotifications(prev => [{
+        id: Date.now(),
+        type: 'appointment_created',
+        message: data.message,
+        appointment: data.appointment || data,
+        timestamp: new Date(),
+      }, ...prev]);
+    };
+
+    const onYourTurn = (data) => {
+      setNotifications(prev => [{
+        id: Date.now(),
+        type: 'your_turn',
+        message: data.message,
+        appointment: data.appointment,
+        token: data.token,
+        timestamp: new Date(),
+        priority: 'high',
+      }, ...prev]);
+      
+      // Show browser notification if permitted
+      if (Notification.permission === 'granted') {
+        new Notification('Your Turn!', {
+          body: data.message,
+          icon: '/logo192.png',
+        });
+      }
+    };
+
+    const onTurnApproaching = (data) => {
+      setNotifications(prev => [{
+        id: Date.now(),
+        type: 'turn_approaching',
+        message: data.message,
+        appointment: data.appointment,
+        position: data.position,
+        timestamp: new Date(),
+        priority: 'medium',
+      }, ...prev]);
+    };
+
+    const onAppointmentCompleted = (data) => {
+      setNotifications(prev => [{
+        id: Date.now(),
+        type: 'appointment_completed',
+        message: data.message,
+        appointment: data.appointment,
+        timestamp: new Date(),
+      }, ...prev]);
+    };
+
+    const onQueueUpdated = (data) => {
+      setNotifications(prev => [{
+        id: Date.now(),
+        type: 'queue_updated',
+        doctorId: data.doctorId,
+        currentToken: data.currentToken,
+        date: data.date,
+        timestamp: new Date(),
+      }, ...prev]);
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('token_updated', onTokenUpdated);
     socket.on('new_appointment', onNewAppointment);
+    socket.on('appointment_created', onAppointmentCreated);
+    socket.on('your_turn', onYourTurn);
+    socket.on('turn_approaching', onTurnApproaching);
+    socket.on('appointment_completed', onAppointmentCompleted);
+    socket.on('queue_updated', onQueueUpdated);
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('token_updated', onTokenUpdated);
       socket.off('new_appointment', onNewAppointment);
+      socket.off('appointment_created', onAppointmentCreated);
+      socket.off('your_turn', onYourTurn);
+      socket.off('turn_approaching', onTurnApproaching);
+      socket.off('appointment_completed', onAppointmentCompleted);
+      socket.off('queue_updated', onQueueUpdated);
     };
   }, []);
 

@@ -1,26 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faUsers, faCalendarCheck, faBed, faUserMd, 
+  faChartLine, faDollarSign, faClipboardList, faArrowUp, faArrowDown
+} from '@fortawesome/free-solid-svg-icons';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [doctorInfo, setDoctorInfo] = useState({
-    name: 'Dr. Johnson',
-    age: 35,
-    gender: 'Male',
-    specialty: 'Cardiology',
-    patients: 120,
-    appointments: 5,
-  });
   const [summary, setSummary] = useState({
-    totalPatients: 120,
-    staffMood: 'Optimistic',
-    appointments: 45,
-    occupiedBeds: 75,
-    availableStaff: 25,
+    totalPatients: 245,
+    todayAppointments: 18,
+    availableBeds: 42,
+    totalBeds: 150,
+    activeStaff: 67,
+    revenue: 125400,
+    revenueGrowth: 12.5,
+    admissions: 156,
+    admissionsGrowth: 8.3
   });
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
 
   useEffect(() => {
     let mounted = true;
@@ -28,282 +33,262 @@ const Dashboard = () => {
     async function fetchData() {
       setLoading(true);
       try {
-        const [sumRes] = await Promise.all([
-          axios.get(`${API_BASE}/api/dashboard/summary`),
+        const token = localStorage.getItem('token');
+        const config = {
+          headers: { Authorization: `Bearer ${token}` }
+        };
+
+        const [sumRes, revRes, admRes, actRes, aptRes] = await Promise.all([
+          axios.get(`${API_BASE}/api/dashboard/summary`, config).catch(() => ({ data: {} })),
+          axios.get(`${API_BASE}/api/dashboard/revenue`, config).catch(() => ({ data: {} })),
+          axios.get(`${API_BASE}/api/dashboard/admissions`, config).catch(() => ({ data: {} })),
+          axios.get(`${API_BASE}/api/dashboard/activity`, config).catch(() => ({ data: { data: [] } })),
+          axios.get(`${API_BASE}/api/dashboard/appointments`, config).catch(() => ({ data: { data: [] } })),
         ]);
 
         if (!mounted) return;
 
-        if (sumRes.data) {
-          setSummary({
-            totalPatients: sumRes.data.patients || 120,
-            staffMood: 'Optimistic',
-            appointments: sumRes.data.appointmentsToday || 45,
-            occupiedBeds: 75,
-            availableStaff: 25,
-          });
+        if (sumRes.data?.data) {
+          setSummary(prev => ({
+            ...prev,
+            totalPatients: sumRes.data.data.totalPatients || prev.totalPatients,
+            todayAppointments: sumRes.data.data.todayAppointments || prev.todayAppointments,
+            availableBeds: sumRes.data.data.availableBeds || prev.availableBeds,
+            totalBeds: sumRes.data.data.totalBeds || prev.totalBeds,
+            activeStaff: sumRes.data.data.activeStaff || prev.activeStaff,
+          }));
+        }
+
+        if (revRes.data?.data) {
+          setSummary(prev => ({
+            ...prev,
+            revenue: revRes.data.data.revenue || prev.revenue,
+            revenueGrowth: revRes.data.data.revenueGrowth || prev.revenueGrowth,
+          }));
+        }
+
+        if (admRes.data?.data) {
+          setSummary(prev => ({
+            ...prev,
+            admissions: admRes.data.data.admissions || prev.admissions,
+            admissionsGrowth: admRes.data.data.admissionsGrowth || prev.admissionsGrowth,
+          }));
+        }
+
+        if (actRes.data?.data) {
+          setRecentActivity(actRes.data.data);
+        }
+
+        if (aptRes.data?.data) {
+          setUpcomingAppointments(aptRes.data.data);
         }
       } catch (err) {
+        console.error('Dashboard fetch error:', err);
         if (!mounted) return;
-        // Keep default values
       } finally {
         if (mounted) setLoading(false);
       }
     }
 
     fetchData();
-
     return () => (mounted = false);
   }, []);
 
-  const currentDate = new Date();
-  const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'long' });
-  const monthName = currentDate.toLocaleDateString('en-US', { month: 'long' });
-  const day = currentDate.getDate();
+
 
   return (
     <Layout>
-      <div className="flex h-screen bg-gray-50">
-        {/* Main Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-8">
-            {/* Breadcrumb */}
-            <div className="text-sm text-gray-500 mb-6">Home / Dashboard</div>
+      <div className="max-w-7xl mx-auto">
+        {/* Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
+          <p className="text-gray-600">Welcome back! Here's what's happening today.</p>
+        </div>
 
-            {/* Welcome Banner */}
-            <div className="bg-gradient-to-r from-blue-400 to-blue-500 rounded-2xl p-6 mb-6 text-white">
-              <div className="flex items-center gap-4 mb-3">
-                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-                  <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
-                  </svg>
-                </div>
-                <h1 className="text-2xl font-bold">Welcome, {doctorInfo.name}!</h1>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Total Patients */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <FontAwesomeIcon icon={faUsers} className="text-blue-600 text-xl" />
               </div>
-              <p className="text-blue-50">
-                Today is {dayName}, {monthName} {day}. You have {doctorInfo.appointments} appointments scheduled, 1 team meeting, and 2 follow-ups to manage. Let's make it a productive day!
-              </p>
+              <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
+                +{summary.admissionsGrowth}%
+              </span>
             </div>
+            <h3 className="text-gray-600 text-sm font-medium mb-1">Total Patients</h3>
+            <p className="text-3xl font-bold text-gray-900">{summary.totalPatients}</p>
+            <p className="text-xs text-gray-500 mt-2">Active patients in system</p>
+          </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-3 gap-6 mb-6">
-              <div className="bg-white rounded-xl p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-sm font-medium text-gray-600">Total Patients</h3>
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{summary.totalPatients}</p>
+          {/* Today's Appointments */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <FontAwesomeIcon icon={faCalendarCheck} className="text-purple-600 text-xl" />
               </div>
-
-              <div className="bg-white rounded-xl p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-sm font-medium text-gray-600">Staff Mood</h3>
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{summary.staffMood}</p>
-              </div>
-
-              <div className="bg-white rounded-xl p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg className="w-6 h-6 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <h3 className="text-sm font-medium text-gray-600">Appointments</h3>
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{summary.appointments}</p>
-              </div>
+              <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                Today
+              </span>
             </div>
+            <h3 className="text-gray-600 text-sm font-medium mb-1">Appointments</h3>
+            <p className="text-3xl font-bold text-gray-900">{summary.todayAppointments}</p>
+            <p className="text-xs text-gray-500 mt-2">Scheduled for today</p>
+          </div>
 
-            {/* Next Appointment and Billing */}
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              {/* Next Appointment */}
-              <div className="bg-white rounded-xl p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Next Appointment</h3>
-                <div className="flex gap-2">
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                    <div
-                      key={num}
-                      className={`flex-1 h-12 rounded-lg flex items-center justify-center font-semibold ${
-                        num === 7
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {num}
-                    </div>
-                  ))}
-                </div>
+          {/* Available Beds */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <FontAwesomeIcon icon={faBed} className="text-green-600 text-xl" />
               </div>
-
-              {/* Ward Utilization */}
-              <div className="bg-white rounded-xl p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Ward Utilization</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                      </svg>
-                      <span className="text-sm text-gray-600">Occupied Beds</span>
-                    </div>
-                    <span className="text-2xl font-bold text-gray-900">{summary.occupiedBeds}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
-                      </svg>
-                      <span className="text-sm text-gray-600">Available Staff</span>
-                    </div>
-                    <span className="text-2xl font-bold text-gray-900">{summary.availableStaff}%</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                        <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-sm text-gray-600">Patient</span>
-                    </div>
-                    <span className="text-lg font-semibold text-gray-900">Ongoing</span>
-                  </div>
-                </div>
-              </div>
+              <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                {summary.totalBeds} Total
+              </span>
             </div>
+            <h3 className="text-gray-600 text-sm font-medium mb-1">Available Beds</h3>
+            <p className="text-3xl font-bold text-gray-900">{summary.availableBeds}</p>
+            <p className="text-xs text-gray-500 mt-2">Beds ready for patients</p>
+          </div>
 
-            {/* Billing Summary */}
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Billing Summary</h3>
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 text-sm font-medium text-gray-600"></th>
-                    <th className="text-right py-3 text-sm font-medium text-gray-600">Expected</th>
-                    <th className="text-right py-3 text-sm font-medium text-gray-600">Goal</th>
-                    <th className="text-right py-3 text-sm font-medium text-gray-600">Remai</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b border-gray-100">
-                    <td className="py-3 text-sm text-gray-900">Total Revenue</td>
-                    <td className="text-right py-3 text-sm text-gray-900">$50,00</td>
-                    <td className="text-right py-3 text-sm text-gray-900">$60,000</td>
-                    <td className="text-right py-3 text-sm text-gray-900">$10,0</td>
-                  </tr>
-                  <tr className="border-b border-gray-100">
-                    <td className="py-3 text-sm text-gray-900">Pending Payments</td>
-                    <td className="text-right py-3 text-sm text-gray-900">30</td>
-                    <td className="text-right py-3 text-sm text-gray-900">15</td>
-                    <td className="text-right py-3 text-sm text-gray-900">5</td>
-                  </tr>
-                  <tr>
-                    <td className="py-3 text-sm text-gray-900">Expenses</td>
-                    <td className="text-right py-3 text-sm text-gray-900">$20,00</td>
-                    <td className="text-right py-3 text-sm text-gray-900">15,000</td>
-                    <td className="text-right py-3 text-sm text-gray-900">15</td>
-                  </tr>
-                </tbody>
-              </table>
+          {/* Active Staff */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <FontAwesomeIcon icon={faUserMd} className="text-orange-600 text-xl" />
+              </div>
+              <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">
+                Active
+              </span>
+            </div>
+            <h3 className="text-gray-600 text-sm font-medium mb-1">Staff on Duty</h3>
+            <p className="text-3xl font-bold text-gray-900">{summary.activeStaff}</p>
+            <p className="text-xs text-gray-500 mt-2">Medical staff available</p>
+          </div>
+        </div>
+
+        {/* Revenue and Admissions Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Revenue Card */}
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-6 text-white">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Monthly Revenue</h3>
+              <span className="text-2xl opacity-80">₹</span>
+            </div>
+            <p className="text-4xl font-bold mb-2">₹{(summary.revenue / 1000).toFixed(1)}K</p>
+            <div className="flex items-center gap-2">
+              <FontAwesomeIcon icon={summary.revenueGrowth >= 0 ? faArrowUp : faArrowDown} className={summary.revenueGrowth >= 0 ? "text-green-300" : "text-red-300"} />
+              <span className="text-sm text-blue-100">{summary.revenueGrowth >= 0 ? '+' : ''}{summary.revenueGrowth}% from last month</span>
+            </div>
+          </div>
+
+          {/* Admissions Card */}
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-6 text-white">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Total Admissions</h3>
+              <FontAwesomeIcon icon={faClipboardList} className="text-2xl opacity-80" />
+            </div>
+            <p className="text-4xl font-bold mb-2">{summary.admissions}</p>
+            <div className="flex items-center gap-2">
+              <FontAwesomeIcon icon={summary.admissionsGrowth >= 0 ? faArrowUp : faArrowDown} className={summary.admissionsGrowth >= 0 ? "text-green-300" : "text-red-300"} />
+              <span className="text-sm text-purple-100">{summary.admissionsGrowth >= 0 ? '+' : ''}{summary.admissionsGrowth}% from last month</span>
             </div>
           </div>
         </div>
 
-        {/* Right Sidebar - Profile & Upcoming */}
-        <div className="w-80 bg-white border-l border-gray-200 p-6 overflow-y-auto">
-          {/* Profile Card */}
-          <div className="mb-6 text-center">
-            <div className="w-32 h-32 mx-auto mb-4 bg-gray-200 rounded-lg overflow-hidden">
-              <img
-                src="https://via.placeholder.com/150"
-                alt="Dr. Alex Johnson"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-1">Dr. Alex Johnson</h2>
-            <p className="text-sm text-gray-500 mb-4">{doctorInfo.gender}, {doctorInfo.age} years old</p>
-
-            {/* Mini Stats */}
-            <div className="flex justify-center gap-8 mb-4">
-              <div className="text-center">
-                <p className="text-xs text-gray-500 mb-1">Specialt</p>
-                <p className="font-semibold text-gray-900">{doctorInfo.specialty}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500 mb-1">Patients</p>
-                <p className="font-semibold text-gray-900">{doctorInfo.patients}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-gray-500 mb-1">Appoint</p>
-                <p className="font-semibold text-gray-900">{doctorInfo.appointments}</p>
-              </div>
-            </div>
-
-            {/* Calendar Mini */}
-            <div className="flex justify-center gap-2 mb-4">
-              {[
-                { day: 27, label: 'Mon' },
-                { day: 28, label: 'Tue' },
-                { day: 29, label: 'Wed' },
-                { day: 30, label: 'Thu' },
-                { day: 31, label: 'Fri' },
-              ].map((date, idx) => (
-                <div
-                  key={idx}
-                  className={`text-center ${
-                    idx === 2 ? 'text-blue-500 font-semibold' : 'text-gray-400'
-                  }`}
-                >
-                  <div className="text-xl">{date.day}</div>
-                  <div className="text-xs">{date.label}</div>
+        {/* Recent Activity and Upcoming Appointments */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Recent Activity */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+            <div className="space-y-4">
+              {recentActivity.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">No recent activity</p>
+              ) : recentActivity.map((activity) => (
+                <div key={activity.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    activity.type === 'admission' ? 'bg-green-100' :
+                    activity.type === 'appointment' ? 'bg-blue-100' :
+                    activity.type === 'discharge' ? 'bg-orange-100' : 'bg-purple-100'
+                  }`}>
+                    <FontAwesomeIcon icon={faClipboardList} className={
+                      activity.type === 'admission' ? 'text-green-600' :
+                      activity.type === 'appointment' ? 'text-blue-600' :
+                      activity.type === 'discharge' ? 'text-orange-600' : 'text-purple-600'
+                    } />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-gray-900 text-sm">{activity.patient}</p>
+                    <p className="text-xs text-gray-500">{activity.action}</p>
+                  </div>
+                  <span className="text-xs text-gray-400">{activity.time}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Upcoming Section */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming</h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
+          {/* Upcoming Appointments */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Appointments</h3>
+            <div className="space-y-4">
+              {upcomingAppointments.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">No upcoming appointments</p>
+              ) : upcomingAppointments.map((apt) => (
+                <div key={apt.id} className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FontAwesomeIcon icon={faCalendarCheck} className="text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 text-sm truncate">{apt.patient}</p>
+                    <p className="text-xs text-gray-500 truncate">{apt.doctor} • {apt.department}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className="text-sm font-medium text-blue-600">{apt.time}</span>
+                  </div>
                 </div>
-                <span className="text-sm text-gray-700">Team meeting</span>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <span className="text-sm text-gray-700">Patient follow-up</span>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <span className="text-sm text-gray-700">Health check reminder</span>
-              </div>
+              ))}
             </div>
+            <button 
+              onClick={() => navigate('/appointments')}
+              className="w-full mt-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
+            >
+              View All Appointments →
+            </button>
+          </div>
+        </div>
 
-            <button className="w-full mt-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">
-              Edit profile
+        {/* Quick Actions */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button 
+              onClick={() => navigate('/patients')}
+              className="p-4 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-center"
+            >
+              <FontAwesomeIcon icon={faUsers} className="text-2xl text-blue-600 mb-2" />
+              <p className="text-sm font-medium text-gray-900">Add Patient</p>
+            </button>
+            <button 
+              onClick={() => navigate('/appointments')}
+              className="p-4 border border-gray-200 rounded-lg hover:border-purple-400 hover:bg-purple-50 transition-all text-center"
+            >
+              <FontAwesomeIcon icon={faCalendarCheck} className="text-2xl text-purple-600 mb-2" />
+              <p className="text-sm font-medium text-gray-900">Schedule</p>
+            </button>
+            <button 
+              onClick={() => navigate('/doctors')}
+              className="p-4 border border-gray-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-all text-center"
+            >
+              <FontAwesomeIcon icon={faUserMd} className="text-2xl text-green-600 mb-2" />
+              <p className="text-sm font-medium text-gray-900">Add Doctor</p>
+            </button>
+            <button 
+              onClick={() => navigate('/billing')}
+              className="p-4 border border-gray-200 rounded-lg hover:border-orange-400 hover:bg-orange-50 transition-all text-center"
+            >
+              <FontAwesomeIcon icon={faChartLine} className="text-2xl text-orange-600 mb-2" />
+              <p className="text-sm font-medium text-gray-900">Reports</p>
             </button>
           </div>
         </div>

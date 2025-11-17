@@ -1,7 +1,9 @@
 import axios from 'axios';
 
-// Frontend will call backend through proxy at port 5000 during development
-const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// Frontend will call backend at port 5001
+const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+
+console.log('API Base URL:', baseURL); // Debug log
 
 const api = axios.create({
   baseURL,
@@ -74,9 +76,16 @@ export const doctors = {
 };
 
 export const appointments = {
-  list: () => api.get('/api/appointments'),
-  create: (data) => api.post('/api/appointments', data),
-  get: (id) => api.get(`/api/appointments/${id}`),
+  list: (params) => api.get('/api/appointments/all', { params }),
+  create: (data) => api.post('/api/appointments/create', data),
+  get: (id) => api.get(`/api/appointments/detail/${id}`),
+  update: (id, data) => api.put(`/api/appointments/${id}`, data),
+  cancel: (id) => api.post(`/api/appointments/${id}/cancel`),
+  confirm: (id) => api.post(`/api/appointments/${id}/confirm`),
+  complete: (id) => api.post(`/api/appointments/${id}/complete`),
+  remove: (id) => api.delete(`/api/appointments/${id}`),
+  getByDate: (date) => api.get(`/api/appointments/date/${date}`),
+  getDoctorAppointments: (doctorId, params) => api.get(`/api/appointments/doctor/${doctorId}`, { params }),
 };
 
 export const patients = {
@@ -85,6 +94,80 @@ export const patients = {
   get: (id) => api.get(`/api/patients/${id}`),
   update: (id, data) => api.put(`/api/patients/${id}`, data),
   remove: (id) => api.delete(`/api/patients/${id}`),
+  getStats: () => api.get('/api/patients/stats'),
+};
+
+export const beds = {
+  list: (params) => api.get('/api/beds', { params }),
+  get: (id) => api.get(`/api/beds/${id}`),
+  create: (data) => api.post('/api/beds', data),
+  update: (id, data) => api.put(`/api/beds/${id}`, data),
+  remove: (id) => api.delete(`/api/beds/${id}`),
+  assign: (id, data) => api.post(`/api/beds/${id}/assign`, data),
+  release: (id) => api.post(`/api/beds/${id}/release`),
+  getStats: () => api.get('/api/beds/stats'),
+};
+
+export const admissions = {
+  list: (params) => api.get('/api/admissions', { params }),
+  get: (id) => api.get(`/api/admissions/${id}`),
+  create: (data) => api.post('/api/admissions', data),
+  update: (id, data) => api.put(`/api/admissions/${id}`, data),
+  discharge: (id, data) => api.post(`/api/admissions/${id}/discharge`, data),
+  remove: (id) => api.delete(`/api/admissions/${id}`),
+  getStats: () => api.get('/api/admissions/stats'),
+};
+
+export const payments = {
+  list: (params) => api.get('/api/payments', { params }),
+  get: (id) => api.get(`/api/payments/${id}`),
+  create: (data) => api.post('/api/payments', data),
+  update: (id, data) => api.put(`/api/payments/${id}`, data),
+  remove: (id) => api.delete(`/api/payments/${id}`),
+  getStats: () => api.get('/api/payments/stats'),
+  getMonthlyRevenue: () => api.get('/api/payments/monthly-revenue'),
+  getPatientPayments: (patientId) => api.get(`/api/payments/patient/${patientId}`),
+};
+
+export const prescriptions = {
+  list: (params) => api.get('/api/prescriptions', { params }),
+  get: (id) => api.get(`/api/prescriptions/${id}`),
+  create: (data) => api.post('/api/prescriptions', data),
+  update: (id, data) => api.put(`/api/prescriptions/${id}`, data),
+  remove: (id) => api.delete(`/api/prescriptions/${id}`),
+  getPatientPrescriptions: (patientId) => api.get(`/api/prescriptions/patient/${patientId}`),
+  getDoctorPrescriptions: (doctorId) => api.get(`/api/prescriptions/doctor/${doctorId}`),
+};
+
+export const labReports = {
+  list: (params) => api.get('/api/lab-reports', { params }),
+  get: (id) => api.get(`/api/lab-reports/${id}`),
+  create: (data) => api.post('/api/lab-reports', data),
+  update: (id, data) => api.put(`/api/lab-reports/${id}`, data),
+  remove: (id) => api.delete(`/api/lab-reports/${id}`),
+  getStats: () => api.get('/api/lab-reports/stats'),
+  getPatientReports: (patientId) => api.get(`/api/lab-reports/patient/${patientId}`),
+  getByStatus: (status) => api.get(`/api/lab-reports/status/${status}`),
+};
+
+export const departments = {
+  list: (params) => api.get('/api/departments', { params }),
+  get: (id) => api.get(`/api/departments/${id}`),
+  create: (data) => api.post('/api/departments', data),
+  update: (id, data) => api.put(`/api/departments/${id}`, data),
+  remove: (id) => api.delete(`/api/departments/${id}`),
+};
+
+export const dashboard = {
+  getStats: () => api.get('/api/dashboard/stats'),
+  getRecentActivity: () => api.get('/api/dashboard/recent-activity'),
+};
+
+// Token queue management
+export const queue = {
+  getCurrentToken: (doctorId, params) => api.get(`/api/appointments/doctor/${doctorId}/current-token`, { params }),
+  advanceToken: (doctorId, params) => api.post(`/api/appointments/doctor/${doctorId}/advance-token`, null, { params }),
+  resetToken: (doctorId) => api.post(`/api/appointments/doctor/${doctorId}/reset-token`),
 };
 
 export const wards = {

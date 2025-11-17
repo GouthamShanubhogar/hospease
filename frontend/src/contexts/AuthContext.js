@@ -42,8 +42,11 @@ export const AuthProvider = ({ children }) => {
             throw new Error('Token verification failed');
           }
         } catch (err) {
-          console.error('Auth initialization error:', err);
-          // Token invalid/expired - clear auth data
+          // Only log errors that aren't 401 (expired/invalid token is expected)
+          if (err.response?.status !== 401) {
+            console.error('Auth initialization error:', err);
+          }
+          // Token invalid/expired - clear auth data silently
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           delete api.defaults.headers.common['Authorization'];

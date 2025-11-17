@@ -17,7 +17,7 @@ import Appointments from "./pages/Appointments.jsx";
 import Wards from "./pages/Wards.jsx";
 import Billing from "./pages/Billing.jsx";
 import Reception from "./pages/home.jsx";
-import Notifications from "./pages/home.jsx";
+import Notifications from "./pages/Notifications.jsx";
 import Profile from "./pages/profile.jsx";
 import PrivateRoute from "./components/PrivateRoute";
 
@@ -52,33 +52,13 @@ function App() {
               {/* Protected Routes */}
               <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
               <Route path="/hospitals" element={<PrivateRoute><Hospitals /></PrivateRoute>} />
-              <Route path="/doctors" element={
-                <PrivateRoute roles={['admin', 'staff']}>
-                  <Doctors />
-                </PrivateRoute>
-              } />
-              <Route path="/patients" element={
-                <PrivateRoute roles={['admin', 'doctor', 'staff']}>
-                  <Patients />
-                </PrivateRoute>
-              } />
+              <Route path="/doctors" element={<PrivateRoute><Doctors /></PrivateRoute>} />
+              <Route path="/patients" element={<PrivateRoute><Patients /></PrivateRoute>} />
               <Route path="/appointments" element={<PrivateRoute><Appointments /></PrivateRoute>} />
               <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-              <Route path="/wards" element={
-                <PrivateRoute roles={['admin', 'staff']}>
-                  <Wards />
-                </PrivateRoute>
-              } />
-              <Route path="/billing" element={
-                <PrivateRoute roles={['admin', 'staff']}>
-                  <Billing />
-                </PrivateRoute>
-              } />
-              <Route path="/reception" element={
-                <PrivateRoute roles={['admin', 'staff']}>
-                  <Reception />
-                </PrivateRoute>
-              } />
+              <Route path="/wards" element={<PrivateRoute><Wards /></PrivateRoute>} />
+              <Route path="/billing" element={<PrivateRoute><Billing /></PrivateRoute>} />
+              <Route path="/reception" element={<PrivateRoute><Reception /></PrivateRoute>} />
               <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
             </Routes>
             </AppContent>

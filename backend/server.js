@@ -10,6 +10,14 @@ import hospitalRoutes from "./routes/hospitalRoutes.js";
 import doctorRoutes from "./routes/doctorRoutes.js";
 import appointmentRoutes from "./routes/appointmentRoutes.js";
 import departmentRoutes from './routes/departmentRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import patientRoutes from './routes/patientRoutes.js';
+import bedRoutes from './routes/bedRoutes.js';
+import admissionRoutes from './routes/admissionRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import prescriptionRoutes from './routes/prescriptionRoutes.js';
+import labReportRoutes from './routes/labReportRoutes.js';
+import billingRoutes from './routes/billingRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -50,7 +58,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 
 // Test database connection (optional but useful)
-pool.connect()
+pool.query('SELECT NOW()')
   .then(() => console.log("✅ Connected to PostgreSQL database"))
   .catch((err) => console.error("❌ Database connection failed:", err));
 
@@ -62,6 +70,14 @@ app.use("/api/hospitals", hospitalRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/departments", departmentRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/patients", patientRoutes);
+app.use("/api/beds", bedRoutes);
+app.use("/api/admissions", admissionRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/billing", billingRoutes);
+app.use("/api/prescriptions", prescriptionRoutes);
+app.use("/api/lab-reports", labReportRoutes);
 
 // Root endpoint
 app.get("/", (req, res) => {

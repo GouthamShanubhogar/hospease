@@ -16,47 +16,60 @@ const pool = new Pool({
   port: parseInt(process.env.PG_PORT || '5432'),
 });
 
-async function runMigration() {
+async function createAllTables() {
   const client = await pool.connect();
   try {
+    console.log('🔄 Starting database migration...');
     await client.query('BEGIN');
 
-    // Create migrations table if it doesn't exist
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS migrations (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
+    // Read and execute the complete schema file
+    const schemaPath = path.join(__dirname, 'complete_schema.sql');
+    console.log('📖 Reading schema from:', schemaPath);
+    
+    if (!fs.existsSync(schemaPath)) {
+      console.error('❌ Schema file not found:', schemaPath);
+      throw new Error('complete_schema.sql file not found');
+    }
 
-    // Get list of migration files
-    const migrationsDir = path.join(__dirname, 'migrations');
-    const files = fs.readdirSync(migrationsDir)
-      .filter(f => f.endsWith('.sql'))
-      .sort();
+    const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
+    
+    // Split by semicolon and execute each statement
+    const statements = schemaSQL
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !s.startsWith('--'));
 
-    // Check which migrations have been applied
-    const { rows: appliedMigrations } = await client.query(
-      'SELECT name FROM migrations ORDER BY id'
-    );
-    const appliedNames = new Set(appliedMigrations.map(m => m.name));
+    console.log(`📝 Executing ${statements.length} SQL statements...`);
 
-    // Apply new migrations
-    for (const file of files) {
-      if (!appliedNames.has(file)) {
-        console.log(`Applying migration: ${file}`);
-        const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
-        await client.query(sql);
-        await client.query(
-          'INSERT INTO migrations (name) VALUES ($1)',
-          [file]
-        );
+    for (let i = 0; i < statements.length; i++) {
+      const statement = statements[i];
+      if (statement) {
+        try {
+          await client.query(statement + ';');
+          
+          // Log table creation
+          if (statement.toUpperCase().includes('CREATE TABLE')) {
+            const match = statement.match(/CREATE TABLE (?:IF NOT EXISTS )?(\w+)/i);
+            if (match) {
+              console.log(`✅ Table created: ${match[1]}`);
+            }
+          }
+        } catch (err) {
+          // Skip if table already exists
+          if (err.code === '42P07') {
+            const match = statement.match(/CREATE TABLE (?:IF NOT EXISTS )?(\w+)/i);
+            if (match) {
+              console.log(`ℹ️  Table already exists: ${match[1]}`);
+            }
+          } else {
+            console.error(`❌ Error executing statement ${i + 1}:`, err.message);
+          }
+        }
       }
     }
 
     await client.query('COMMIT');
-    console.log('✅ Migrations completed successfully');
+    console.log('✅ Migration completed successfully');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Migration failed:', err);
@@ -68,9 +81,9 @@ async function runMigration() {
 
 // Run migrations if this file is executed directly
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  runMigration()
+  createAllTables()
     .then(() => process.exit(0))
     .catch(() => process.exit(1));
 }
 
-export { runMigration };
+export { createAllTables };
