@@ -18,7 +18,7 @@ router.use(verifyToken);
 // Patient CRUD routes
 router.get('/', getAllPatients);
 router.get('/:id', getPatientById);
-router.post('/', createPatient);
+router.post('/', createPatient); // Keep this for backward compatibility
 router.put('/:id', updatePatient);
 router.delete('/:id', deletePatient);
 

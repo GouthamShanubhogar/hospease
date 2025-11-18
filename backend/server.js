@@ -62,9 +62,47 @@ pool.query('SELECT NOW()')
   .then(() => console.log("✅ Connected to PostgreSQL database"))
   .catch((err) => console.error("❌ Database connection failed:", err));
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'HospEase backend server is running',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// API status endpoint with database check
+app.get('/api/status', async (req, res) => {
+  try {
+    // Test database connection
+    await pool.query('SELECT NOW()');
+    res.status(200).json({
+      status: 'OK',
+      message: 'All systems operational',
+      database: 'Connected',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'ERROR',
+      message: 'Database connection failed',
+      database: 'Disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
+
+// Open registration endpoint (no auth required)
+import { createPatient } from './controllers/patientController.js';
+app.post("/api/patients/register", createPatient);
+
 // Feature routes
 app.use("/api/hospitals", hospitalRoutes);
 app.use("/api/doctors", doctorRoutes);
@@ -82,6 +120,11 @@ app.use("/api/lab-reports", labReportRoutes);
 // Root endpoint
 app.get("/", (req, res) => {
   res.send("🏥 HospEase API is running...");
+});
+
+// Test endpoint
+app.get("/test", (req, res) => {
+  res.json({ message: "Server is working!" });
 });
 
 // Start server with Socket.IO

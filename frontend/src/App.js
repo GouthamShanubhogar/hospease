@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard.jsx";
 import Hospitals from "./pages/home.jsx";
 import Doctors from "./pages/Doctors.jsx";
 import Patients from "./pages/Patients.jsx";
+import PatientRegistrationAndBooking from "./pages/PatientRegistrationAndBooking.jsx";
 import Appointments from "./pages/Appointments.jsx";
 import Wards from "./pages/Wards.jsx";
 import Billing from "./pages/Billing.jsx";
@@ -48,6 +49,7 @@ function App() {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/patient-booking" element={<PatientRegistrationAndBooking />} />
               
               {/* Protected Routes */}
               <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />

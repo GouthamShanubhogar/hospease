@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { useNavigate, useLocation, Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSpinner, faHospital } from "@fortawesome/free-solid-svg-icons";
+import { faSpinner, faHospital, faExclamationCircle } from "@fortawesome/free-solid-svg-icons";
+import ConnectionError from "../components/ConnectionError";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
+  const [showConnectionError, setShowConnectionError] = useState(false);
 
   const from = location.state?.from?.pathname || "/dashboard";
 
@@ -53,15 +55,40 @@ export default function Login() {
       await login(formData.email, formData.password);
       navigate(from, { replace: true });
     } catch (err) {
-      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+      console.error('Login error details:', err);
+      
+      // Handle connection errors specifically
+      if (err.isConnectionError || err.code === 'ERR_NETWORK' || 
+          err.message?.includes('connect') || err.message?.includes('server')) {
+        setShowConnectionError(true);
+        setError('Unable to connect to the server. Please check your connection and try again.');
+      } else if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
         setError(err.response.data.errors[0]);
       } else if (err.response?.data?.message) {
         setError(err.response.data.message);
+      } else if (err.message && !err.message.includes('Network Error')) {
+        setError(err.message);
       } else {
-        setError("Failed to login. Please check your credentials.");
+        setError('Failed to login. Please check your credentials and try again.');
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConnectionRetry = async () => {
+    try {
+      // Test connection to backend
+      const response = await fetch('http://localhost:5001/health');
+      if (response.ok) {
+        setShowConnectionError(false);
+        setError('');
+        return true;
+      }
+      throw new Error('Server not responding');
+    } catch (error) {
+      console.error('Connection retry failed:', error);
+      throw error;
     }
   };
 
@@ -174,6 +201,13 @@ export default function Login() {
           </p>
         </div>
       </div>
+      
+      {/* Connection Error Modal */}
+      <ConnectionError 
+        isVisible={showConnectionError}
+        onRetry={handleConnectionRetry}
+        onClose={() => setShowConnectionError(false)}
+      />
     </div>
   );
 }

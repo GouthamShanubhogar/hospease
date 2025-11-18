@@ -1,0 +1,28 @@
+{
+  "name": "hospease",
+  "version": "1.0.0",
+  "description": "HospEase - Smart Hospital Queue Management System",
+  "scripts": {
+    "start": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && npm start",
+    "frontend": "cd frontend && npm start", 
+    "backend:dev": "cd backend && npm run dev",
+    "backend:stop": "cd backend && npm run stop",
+    "backend:restart": "cd backend && npm run restart",
+    "backend:status": "cd backend && npm run status",
+    "dev": "concurrently \"npm run backend:dev\" \"cd frontend && npm start\"",
+    "setup": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "clean": "rm -rf node_modules backend/node_modules frontend/node_modules",
+    "health": "curl http://localhost:5001/health && echo '\n' && curl http://localhost:3000"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": ["healthcare", "hospital", "management", "queue", "react", "nodejs"],
+  "author": "Goutham",
+  "license": "ISC",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}

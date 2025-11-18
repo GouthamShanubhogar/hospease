@@ -80,6 +80,17 @@ export const AuthProvider = ({ children }) => {
         throw new Error(res.data.message || 'Invalid response from server');
       }
     } catch (err) {
+      // Enhanced error handling for connection issues
+      if (err.isConnectionError || err.code === 'ERR_NETWORK') {
+        console.error('🚨 Backend Connection Error:', err);
+        
+        // Show user-friendly error
+        const error = new Error('Unable to connect to the server. Please check if the backend server is running and try again.');
+        error.isConnectionError = true;
+        error.originalError = err;
+        throw error;
+      }
+      
       console.error('Login error:', err);
       throw err.response?.data || err;
     }

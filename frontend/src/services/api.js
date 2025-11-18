@@ -5,15 +5,69 @@ const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 console.log('API Base URL:', baseURL); // Debug log
 
+// Enhanced axios configuration with retry logic
 const api = axios.create({
   baseURL,
   headers: {
     'Content-Type': 'application/json'
   },
   withCredentials: true,
+  timeout: 30000, // 30 second timeout
 });
 
-// Add response interceptors for handling auth errors and token refresh
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+// Function to check if backend is accessible
+const checkBackendHealth = async () => {
+  try {
+    const response = await fetch(`${baseURL}/health`, { 
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+};
+
+// Function to show user-friendly error messages
+const showConnectionError = () => {
+  console.error('🚨 Backend Connection Error:', {
+    message: 'Cannot connect to the HospEase backend server.',
+    solutions: [
+      '1. Make sure the backend server is running on port 5001',
+      '2. Run: cd backend && npm start',
+      '3. Check if port 5001 is blocked by firewall',
+      '4. Verify database connection is working'
+    ],
+    troubleshooting: 'Check the browser console and backend logs for more details'
+  });
+  
+  // Show user notification
+  const event = new CustomEvent('backendConnectionError', {
+    detail: {
+      message: 'Backend server is not responding. Please contact support or try again later.',
+      type: 'error'
+    }
+  });
+  window.dispatchEvent(event);
+};
+
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Enhanced response interceptor with retry logic
 api.interceptors.response.use(
   (response) => {
     // Check for new token in response header
@@ -24,7 +78,45 @@ api.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // Handle network errors with retry logic
+    if (error.code === 'ERR_NETWORK' || error.code === 'ECONNREFUSED' || 
+        error.message === 'Network Error' || !error.response) {
+      
+      // Check if we haven't exceeded retry attempts
+      if (!originalRequest._retryCount) {
+        originalRequest._retryCount = 0;
+      }
+      
+      if (originalRequest._retryCount < MAX_RETRIES) {
+        originalRequest._retryCount += 1;
+        
+        console.warn(`🔄 Retrying request (${originalRequest._retryCount}/${MAX_RETRIES}) to ${originalRequest.url}`);
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * originalRequest._retryCount));
+        
+        // Check backend health before retrying
+        const isHealthy = await checkBackendHealth();
+        if (isHealthy || originalRequest._retryCount < MAX_RETRIES) {
+          return api(originalRequest);
+        }
+      }
+      
+      // All retries failed
+      console.error('🚨 Backend server connection failed after all retries');
+      showConnectionError();
+      
+      // Return a user-friendly error
+      return Promise.reject({
+        ...error,
+        userMessage: 'Unable to connect to the server. Please try again in a moment.',
+        isConnectionError: true
+      });
+    }
+    
     // Handle authentication errors
     if (error.response?.status === 401 || error.response?.status === 403) {
       const currentPath = window.location.pathname;

@@ -1,21 +1,26 @@
 import pool from '../config/db.js';
+import bcrypt from 'bcrypt';
 
 // Get all patients
 export const getAllPatients = async (req, res) => {
   try {
     // Try with appointments join
-    let query = `
+    const query = `
       SELECT 
-        u.user_id,
-        u.name,
+        u.id,
+        u.name as patient_name,
         u.email,
         u.phone,
         u.created_at,
-        COUNT(DISTINCT a.appointment_id) as total_appointments
+        p.date_of_birth,
+        p.gender,
+        p.blood_group,
+        COUNT(DISTINCT a.id) as total_appointments
       FROM users u
-      LEFT JOIN appointments a ON u.user_id = a.patient_id
+      LEFT JOIN patient_profiles p ON u.id = p.user_id
+      LEFT JOIN appointments a ON u.id = a.patient_id
       WHERE u.role = 'patient'
-      GROUP BY u.user_id, u.name, u.email, u.phone, u.created_at
+      GROUP BY u.id, u.name, u.email, u.phone, u.created_at, p.date_of_birth, p.gender, p.blood_group
       ORDER BY u.created_at DESC
     `;
     
@@ -31,11 +36,14 @@ export const getAllPatients = async (req, res) => {
     // Fallback to simple query without joins
     const simpleQuery = `
       SELECT 
-        user_id,
-        name,
+        id,
+        name as patient_name,
         email,
         phone,
         created_at,
+        null as date_of_birth,
+        null as gender,
+        null as blood_group,
         0 as total_appointments
       FROM users 
       WHERE role = 'patient'
@@ -58,22 +66,43 @@ export const getPatientById = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const query = `
-      SELECT u.*, 
-             (SELECT COUNT(*) FROM appointments WHERE patient_id = u.id) as total_appointments,
-             (SELECT COUNT(*) FROM admissions WHERE patient_id = u.id) as total_admissions,
-             (SELECT COUNT(*) FROM medical_records WHERE patient_id = u.id) as total_records
+    // Try to get patient with profile data first
+    let query = `
+      SELECT u.id, u.name as patient_name, u.email, u.phone, u.created_at,
+             p.date_of_birth, p.gender, p.address, p.blood_group,
+             p.emergency_contact, p.emergency_contact_name,
+             p.patient_type, p.insurance_provider, p.insurance_number,
+             p.referring_doctor, p.medical_notes,
+             (SELECT COUNT(*) FROM appointments WHERE patient_id = u.id) as total_appointments
       FROM users u
-      WHERE u.id = ? AND u.role = 'patient'
+      LEFT JOIN patient_profiles p ON u.id = p.user_id
+      WHERE u.id = $1 AND u.role = 'patient'
     `;
     
-    const [patients] = await pool.query(query, [id]);
+    let result;
+    try {
+      result = await pool.query(query, [id]);
+    } catch (error) {
+      // If patient_profiles table doesn't exist, use basic query
+      console.log('Patient profiles table not found, using basic query:', error.message);
+      query = `
+        SELECT u.id, u.name as patient_name, u.email, u.phone, u.created_at,
+               null as date_of_birth, null as gender, null as address, null as blood_group,
+               null as emergency_contact, null as emergency_contact_name,
+               null as patient_type, null as insurance_provider, null as insurance_number,
+               null as referring_doctor, null as medical_notes,
+               (SELECT COUNT(*) FROM appointments WHERE patient_id = u.id) as total_appointments
+        FROM users u
+        WHERE u.id = $1 AND u.role = 'patient'
+      `;
+      result = await pool.query(query, [id]);
+    }
     
-    if (patients.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Patient not found' });
     }
     
-    res.json({ success: true, data: patients[0] });
+    res.json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error('Error fetching patient:', error);
     res.status(500).json({ success: false, message: 'Error fetching patient', error: error.message });
@@ -111,24 +140,42 @@ export const createPatient = async (req, res) => {
     }
 
     // Check if email already exists
-    const emailCheck = await pool.query('SELECT user_id FROM users WHERE email = $1', [email]);
+    const emailCheck = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (emailCheck.rows.length > 0) {
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
     
+    // Generate a default password for patient (they can change it later)
+    const defaultPassword = await bcrypt.hash('patient123', 10);
+    
     // Insert patient
     const query = `
       INSERT INTO users (
-        name, email, phone, role, created_at, updated_at
-      ) VALUES ($1, $2, $3, 'patient', NOW(), NOW())
-      RETURNING user_id, name, email, phone
+        name, email, phone, password, role, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, 'patient', NOW(), NOW())
+      RETURNING id, name, email, phone
     `;
     
-    const result = await pool.query(query, [name, email, phone]);
-    const patientId = result.rows[0].user_id;
+    const result = await pool.query(query, [name, email, phone, defaultPassword]);
+    const patientId = result.rows[0].id;
     
     // Create patient profile with additional details
     try {
+      console.log('Creating patient profile for user ID:', patientId);
+      console.log('Profile data:', {
+        date_of_birth,
+        gender,
+        address,
+        blood_group,
+        emergency_contact,
+        emergency_contact_name,
+        patient_type,
+        insurance_provider,
+        insurance_number,
+        referring_doctor,
+        notes
+      });
+      
       const profileQuery = `
         INSERT INTO patient_profiles (
           user_id, 
@@ -142,14 +189,14 @@ export const createPatient = async (req, res) => {
           insurance_provider,
           insurance_number,
           referring_doctor,
-          notes,
+          medical_notes,
           estimated_cost,
           payment_method,
           created_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
       `;
       
-      await pool.query(profileQuery, [
+      const profileResult = await pool.query(profileQuery, [
         patientId,
         date_of_birth,
         gender,
@@ -165,7 +212,10 @@ export const createPatient = async (req, res) => {
         estimated_cost || 0,
         payment_method || 'later'
       ]);
+      
+      console.log('Profile created successfully:', profileResult.rowCount);
     } catch (profileError) {
+      console.error('Patient profile creation error:', profileError);
       console.log('Patient profile table does not exist, skipping profile creation:', profileError.message);
     }
     
@@ -188,18 +238,69 @@ export const createPatient = async (req, res) => {
 export const updatePatient = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, status } = req.body;
+    const { 
+      patientName, 
+      email, 
+      contact, 
+      dateOfBirth,
+      gender,
+      address,
+      bloodGroup,
+      emergencyContact,
+      emergencyContactName,
+      insuranceProvider,
+      insuranceNumber,
+      notes
+    } = req.body;
     
-    const query = `
+    // Update basic user information
+    const userQuery = `
       UPDATE users 
-      SET name = ?, email = ?, phone = ?, status = ?
-      WHERE id = ? AND role = 'patient'
+      SET name = $1, email = $2, phone = $3, updated_at = NOW()
+      WHERE id = $4 AND role = 'patient'
     `;
     
-    const [result] = await pool.query(query, [name, email, phone, status, id]);
+    const userResult = await pool.query(userQuery, [patientName, email, contact, id]);
     
-    if (result.affectedRows === 0) {
+    if (userResult.rowCount === 0) {
       return res.status(404).json({ success: false, message: 'Patient not found' });
+    }
+    
+    // Try to update patient profile (if table exists)
+    try {
+      const profileQuery = `
+        INSERT INTO patient_profiles (
+          user_id, date_of_birth, gender, address, blood_group,
+          emergency_contact, emergency_contact_name,
+          insurance_provider, insurance_number, medical_notes, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+          date_of_birth = EXCLUDED.date_of_birth,
+          gender = EXCLUDED.gender,
+          address = EXCLUDED.address,
+          blood_group = EXCLUDED.blood_group,
+          emergency_contact = EXCLUDED.emergency_contact,
+          emergency_contact_name = EXCLUDED.emergency_contact_name,
+          insurance_provider = EXCLUDED.insurance_provider,
+          insurance_number = EXCLUDED.insurance_number,
+          medical_notes = EXCLUDED.medical_notes,
+          updated_at = NOW()
+      `;
+      
+      await pool.query(profileQuery, [
+        id,
+        dateOfBirth || null,
+        gender || null,
+        address || null,
+        bloodGroup || null,
+        emergencyContact || null,
+        emergencyContactName || null,
+        insuranceProvider || null,
+        insuranceNumber || null,
+        notes || null
+      ]);
+    } catch (profileError) {
+      console.log('Patient profile update failed (table may not exist):', profileError.message);
     }
     
     res.json({ success: true, message: 'Patient updated successfully' });

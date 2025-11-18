@@ -6,6 +6,10 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "dev": "node server.js",
+    "restart": "pkill -f 'node.*server.js' || true && node server.js",
+    "stop": "pkill -f 'node.*server.js' || echo 'No server process found'",
+    "status": "netstat -ano | findstr :5001 || echo 'Server not running on port 5001'",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
