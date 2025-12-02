@@ -66,3 +66,12 @@ logs/
 
 # Yarn Integrity file
 .yarn-integrity
+# Temporary files and build outputs
+*.pid
+build_output.txt
+*test*.js
+*migration*.js
+*fix*.sql
+*check*.js
+backend/backend.pid
+
