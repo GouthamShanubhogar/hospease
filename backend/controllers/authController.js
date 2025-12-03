@@ -7,8 +7,10 @@ dotenv.config();
 
 // 🧾 Register User
 export const registerUser = async (req, res) => {
+  let email = null; // Declare email outside try block for error context
   try {
-    const { name, email, password, phone, role } = req.body;
+    const { name, email: userEmail, password, phone, role } = req.body;
+    email = userEmail; // Assign for error context
 
     // Input validation
     const errors = [];
@@ -43,7 +45,7 @@ export const registerUser = async (req, res) => {
 
     // Insert new user
     const newUser = await pool.query(
-      `INSERT INTO users (name, email, password, phone, role)
+      `INSERT INTO users (name, email, password_hash, phone, role)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING id, name, email, role`,
       [name, email, hashedPassword, phone || null, role || "patient"]
@@ -58,7 +60,7 @@ export const registerUser = async (req, res) => {
     console.error("❌ Error in registerUser:", {
       error: err.message,
       stack: err.stack,
-      context: { email }
+      context: { email, body: req.body }
     });
     res.status(500).json({
       status: "error",
@@ -70,8 +72,11 @@ export const registerUser = async (req, res) => {
 
 // 🔐 Login User
 export const loginUser = async (req, res) => {
+  let email = null; // Declare email outside try block for error context
   try {
-    const { email, password } = req.body;
+    const requestBody = req.body;
+    email = requestBody.email;
+    const password = requestBody.password;
 
     // Input validation
     const errors = [];
@@ -97,7 +102,7 @@ export const loginUser = async (req, res) => {
     const user = userResult.rows[0];
 
     // Compare passwords
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({
         status: "error",
@@ -127,7 +132,7 @@ export const loginUser = async (req, res) => {
     console.error("❌ Error in loginUser:", {
       error: err.message,
       stack: err.stack,
-      context: { email }
+      context: { email, body: req.body }
     });
     res.status(500).json({
       status: "error",
