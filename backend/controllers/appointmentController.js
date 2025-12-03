@@ -7,19 +7,15 @@ export const getAllAppointments = async (req, res) => {
     
     let query = `
       SELECT a.*, 
-             u.name as patient_name,
-             u.email as patient_email,
-             u.phone as patient_phone,
+             p.patient_name,
+             p.email_address as patient_email,
+             p.phone_number as patient_phone,
              d.name as doctor_name,
-             doc.specialization,
-             dept.name as department_name,
-             h.name as hospital_name
+             d.specialty as specialization,
+             a.token_number
       FROM appointments a
-      LEFT JOIN users u ON a.patient_id = u.id
-      LEFT JOIN doctors doc ON a.doctor_id = doc.id
-      LEFT JOIN users d ON doc.user_id = d.id
-      LEFT JOIN departments dept ON a.department_id = dept.id
-      LEFT JOIN hospitals h ON a.hospital_id = h.id
+      LEFT JOIN patients p ON a.patient_id = p.patient_id
+      LEFT JOIN doctors d ON a.doctor_id = d.id
       WHERE 1=1
     `;
     
@@ -567,5 +563,193 @@ export const getAppointment = async (req, res) => {
   } catch (err) {
     console.error('Error fetching appointment:', err.message);
     res.status(500).json({ status: 'error', message: 'Unable to fetch appointment', error: err.message });
+  }
+};
+
+// Get appointment statistics
+export const getAppointmentStats = async (req, res) => {
+  try {
+    const { doctor_id, date_range } = req.query;
+    
+    let dateFilter = '';
+    let params = [];
+    let paramIndex = 1;
+    
+    if (doctor_id) {
+      dateFilter += ` AND doctor_id = $${paramIndex++}`;
+      params.push(doctor_id);
+    }
+    
+    if (date_range) {
+      const [startDate, endDate] = date_range.split(',');
+      dateFilter += ` AND appointment_date BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+      params.push(startDate, endDate);
+    } else {
+      // Default to current month
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      dateFilter += ` AND appointment_date BETWEEN $${paramIndex++} AND $${paramIndex++}`;
+      params.push(startOfMonth, endOfMonth);
+    }
+    
+    const statsQuery = `
+      SELECT 
+        COUNT(*) as total_appointments,
+        COUNT(CASE WHEN status = 'scheduled' THEN 1 END) as scheduled_count,
+        COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as confirmed_count,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count,
+        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_count,
+        COUNT(CASE WHEN status = 'no_show' THEN 1 END) as no_show_count,
+        AVG(CASE 
+          WHEN status = 'completed' AND updated_at IS NOT NULL 
+          THEN EXTRACT(EPOCH FROM (updated_at - created_at))/60 
+        END) as avg_consultation_time_minutes
+      FROM appointments 
+      WHERE 1=1 ${dateFilter}
+    `;
+    
+    const result = await pool.query(statsQuery, params);
+    const stats = result.rows[0];
+    
+    // Convert numeric strings to numbers
+    Object.keys(stats).forEach(key => {
+      if (stats[key] !== null && !isNaN(stats[key])) {
+        stats[key] = parseInt(stats[key]) || parseFloat(stats[key]);
+      }
+    });
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching appointment stats:', error);
+    res.status(500).json({ success: false, message: 'Error fetching appointment stats', error: error.message });
+  }
+};
+
+// Get upcoming appointments for a patient
+export const getPatientUpcomingAppointments = async (req, res) => {
+  try {
+    const { patient_id } = req.params;
+    const today = new Date().toISOString().split('T')[0];
+    
+    const query = `
+      SELECT a.*, 
+             d.name as doctor_name,
+             d.specialization,
+             dept.name as department_name,
+             h.name as hospital_name,
+             h.address as hospital_address
+      FROM appointments a
+      LEFT JOIN doctors d ON a.doctor_id = d.id
+      LEFT JOIN departments dept ON a.department_id = dept.id
+      LEFT JOIN hospitals h ON a.hospital_id = h.id
+      WHERE a.patient_id = $1 
+        AND a.appointment_date >= $2
+        AND a.status IN ('scheduled', 'confirmed')
+      ORDER BY a.appointment_date ASC, a.appointment_time ASC
+      LIMIT 10
+    `;
+    
+    const result = await pool.query(query, [patient_id, today]);
+    
+    res.json({
+      success: true,
+      data: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching upcoming appointments:', error);
+    res.status(500).json({ success: false, message: 'Error fetching upcoming appointments', error: error.message });
+  }
+};
+
+// Reschedule appointment
+export const rescheduleAppointment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { new_date, new_time, reason } = req.body;
+    
+    if (!new_date || !new_time) {
+      return res.status(400).json({ success: false, message: 'New date and time are required' });
+    }
+    
+    // Check if appointment exists
+    const appointmentCheck = await pool.query('SELECT * FROM appointments WHERE appointment_id = $1', [id]);
+    if (appointmentCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+    
+    const appointment = appointmentCheck.rows[0];
+    
+    // Update appointment with new schedule
+    const updateQuery = `
+      UPDATE appointments 
+      SET appointment_date = $1, 
+          appointment_time = $2, 
+          status = 'rescheduled',
+          notes = COALESCE(notes, '') || $3,
+          updated_at = NOW()
+      WHERE appointment_id = $4
+      RETURNING *
+    `;
+    
+    const result = await pool.query(updateQuery, [
+      new_date, 
+      new_time, 
+      reason ? `\\nRescheduled: ${reason}` : '\\nRescheduled by request',
+      id
+    ]);
+    
+    // Emit socket notification
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user_${appointment.patient_id}`).emit('appointment_rescheduled', {
+        appointment: result.rows[0],
+        message: `Your appointment has been rescheduled to ${new_date} at ${new_time}`
+      });
+      
+      io.to(`doctor_${appointment.doctor_id}`).emit('appointment_rescheduled', {
+        appointment: result.rows[0],
+        message: 'An appointment has been rescheduled'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Appointment rescheduled successfully',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error rescheduling appointment:', error);
+    res.status(500).json({ success: false, message: 'Error rescheduling appointment', error: error.message });
+  }
+};
+
+// Mark appointment as no-show
+export const markNoShow = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(`
+      UPDATE appointments 
+      SET status = 'no_show', updated_at = NOW()
+      WHERE appointment_id = $1
+      RETURNING *
+    `, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Appointment marked as no-show',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error marking no-show:', error);
+    res.status(500).json({ success: false, message: 'Error marking no-show', error: error.message });
   }
 };

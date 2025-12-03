@@ -15,10 +15,17 @@ import {
 	getCurrentToken,
 	advanceToken,
 	resetTokenCounter,
+	getAppointmentStats,
+	getPatientUpcomingAppointments,
+	rescheduleAppointment,
+	markNoShow
 } from '../controllers/appointmentController.js';
 import { verifyToken } from '../middleware/verifyToken.js';
 
 const router = express.Router();
+
+// Test route without authentication
+router.get('/test', getAllAppointments);
 
 // All routes are protected with authentication
 router.use(verifyToken);
@@ -39,6 +46,14 @@ router.post('/:id/complete', completeAppointment);
 router.get('/doctor/:doctorId/current-token', getCurrentToken);
 router.post('/doctor/:doctorId/advance-token', advanceToken);
 router.post('/doctor/:doctorId/reset-token', resetTokenCounter);
+
+// Statistics and analytics routes
+router.get('/stats', getAppointmentStats);
+router.get('/patient/:patient_id/upcoming', getPatientUpcomingAppointments);
+
+// Additional appointment management routes
+router.post('/:id/reschedule', rescheduleAppointment);
+router.post('/:id/no-show', markNoShow);
 
 // Legacy routes for backward compatibility
 router.get('/', listAppointments);

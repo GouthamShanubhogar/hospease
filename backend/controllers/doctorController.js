@@ -5,100 +5,57 @@ export const getAllDoctors = async (req, res) => {
   try {
     const { hospital_id, department_id, specialization } = req.query;
     
-    // Try to get doctors from doctors table with joins
+    // Use the doctors table directly
     let query = `
       SELECT 
-        u.user_id,
-        u.name,
-        u.email,
-        u.phone,
-        u.role,
-        d.specialization,
-        d.doctor_id,
-        d.department_id,
-        d.hospital_id,
-        dept.name as department_name,
-        h.name as hospital_name
-      FROM users u
-      LEFT JOIN doctors d ON u.user_id = d.user_id
-      LEFT JOIN departments dept ON d.department_id = dept.department_id
-      LEFT JOIN hospitals h ON d.hospital_id = h.hospital_id
-      WHERE u.role = 'doctor'
+        id as doctor_id,
+        name,
+        email,
+        phone,
+        specialty as specialization,
+        sub_specialty,
+        experience_years,
+        location,
+        qualification,
+        consultation_fee,
+        rating,
+        status,
+        available_today,
+        available_tomorrow,
+        available_this_week,
+        bio
+      FROM doctors
+      WHERE status = 'active'
     `;
     
     const params = [];
     let paramIndex = 1;
     
     if (hospital_id) {
-      query += ` AND d.hospital_id = $${paramIndex++}`;
+      query += ` AND hospital_id = $${paramIndex++}`;
       params.push(hospital_id);
     }
     
     if (department_id) {
-      query += ` AND d.department_id = $${paramIndex++}`;
+      query += ` AND department_id = $${paramIndex++}`;
       params.push(department_id);
     }
     
     if (specialization) {
-      query += ` AND d.specialization ILIKE $${paramIndex++}`;
+      query += ` AND specialty ILIKE $${paramIndex++}`;
       params.push(`%${specialization}%`);
     }
     
-    query += ' ORDER BY u.name';
+    query += ' ORDER BY name';
     
-    try {
-      const result = await pool.query(query, params);
-      if (result.rows.length > 0) {
-        return res.json({ success: true, data: result.rows });
-      }
-    } catch (err) {
-      console.log('Doctors table not found, falling back to users table:', err.message);
-    }
-    
-    // Fallback: Get all users with doctor role
-    const fallbackQuery = `
-      SELECT 
-        user_id,
-        name,
-        email,
-        phone,
-        role,
-        'General Practice' as specialization
-      FROM users 
-      WHERE role = 'doctor'
-      ORDER BY name
-    `;
-    
-    const fallbackResult = await pool.query(fallbackQuery);
-    
-    // If no doctors in DB, return mock data
-    if (fallbackResult.rows.length === 0) {
-      return res.json({ 
-        success: true, 
-        data: [
-          { user_id: '1', name: 'Dr. Emily Carter', specialization: 'Cardiology', email: 'emily@hospital.com' },
-          { user_id: '2', name: 'Dr. Michael Lee', specialization: 'Neurology', email: 'michael@hospital.com' },
-          { user_id: '3', name: 'Dr. Sarah Brown', specialization: 'Orthopedics', email: 'sarah@hospital.com' },
-          { user_id: '4', name: 'Dr. James Wilson', specialization: 'Pediatrics', email: 'james@hospital.com' },
-          { user_id: '5', name: 'Dr. Lisa Anderson', specialization: 'Dermatology', email: 'lisa@hospital.com' },
-        ] 
-      });
-    }
-    
-    res.json({ success: true, data: fallbackResult.rows });
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching doctors:', error);
-    
-    // Return mock data on error
     res.json({ 
-      success: true, 
-      data: [
-        { user_id: '1', name: 'Dr. Emily Carter', specialization: 'Cardiology', email: 'emily@hospital.com' },
-        { user_id: '2', name: 'Dr. Michael Lee', specialization: 'Neurology', email: 'michael@hospital.com' },
-        { user_id: '3', name: 'Dr. Sarah Brown', specialization: 'Orthopedics', email: 'sarah@hospital.com' },
-        { user_id: '4', name: 'Dr. James Wilson', specialization: 'Pediatrics', email: 'james@hospital.com' },
-        { user_id: '5', name: 'Dr. Lisa Anderson', specialization: 'Dermatology', email: 'lisa@hospital.com' },
-      ] 
+      success: false, 
+      message: 'Error fetching doctors',
+      data: [] 
     });
   }
 };
@@ -126,24 +83,7 @@ export const listDoctors = async (req, res) => {
 export const getDoctorById = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const query = `
-      SELECT d.*, 
-             u.name as doctor_name,
-             u.email,
-             u.phone,
-             u.address,
-             dept.name as department_name,
-             h.name as hospital_name,
-             h.address as hospital_address
-      FROM doctors d
-      LEFT JOIN users u ON d.user_id = u.id
-      LEFT JOIN departments dept ON d.department_id = dept.id
-      LEFT JOIN hospitals h ON d.hospital_id = h.id
-      WHERE d.id = $1
-    `;
-    
-    const result = await pool.query(query, [id]);
+    const result = await pool.query('SELECT * FROM doctors WHERE id = $1 AND status = $2', [id, 'active']);
     
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Doctor not found' });

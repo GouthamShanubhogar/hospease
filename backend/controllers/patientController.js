@@ -4,58 +4,33 @@ import bcrypt from 'bcrypt';
 // Get all patients
 export const getAllPatients = async (req, res) => {
   try {
-    // Try with appointments join
+    // Use the patients table directly
     const query = `
       SELECT 
-        u.id,
-        u.name as patient_name,
-        u.email,
-        u.phone,
-        u.created_at,
-        p.date_of_birth,
-        p.gender,
-        p.blood_group,
-        COUNT(DISTINCT a.id) as total_appointments
-      FROM users u
-      LEFT JOIN patient_profiles p ON u.id = p.user_id
-      LEFT JOIN appointments a ON u.id = a.patient_id
-      WHERE u.role = 'patient'
-      GROUP BY u.id, u.name, u.email, u.phone, u.created_at, p.date_of_birth, p.gender, p.blood_group
-      ORDER BY u.created_at DESC
-    `;
-    
-    try {
-      const result = await pool.query(query);
-      if (result.rows.length > 0) {
-        return res.json({ success: true, data: result.rows });
-      }
-    } catch (err) {
-      console.log('Appointments table not found, using simple query:', err.message);
-    }
-    
-    // Fallback to simple query without joins
-    const simpleQuery = `
-      SELECT 
-        id,
-        name as patient_name,
-        email,
-        phone,
-        created_at,
-        null as date_of_birth,
-        null as gender,
-        null as blood_group,
-        0 as total_appointments
-      FROM users 
-      WHERE role = 'patient'
+        patient_id as id,
+        patient_name,
+        email_address as email,
+        phone_number as phone,
+        date_of_birth,
+        gender,
+        blood_group,
+        address,
+        patient_type,
+        status,
+        total_appointments,
+        created_at
+      FROM patients 
+      WHERE status = 'Active'
       ORDER BY created_at DESC
     `;
     
-    const result = await pool.query(simpleQuery);
+    const result = await pool.query(query);
     res.json({ success: true, data: result.rows });
   } catch (error) {
     console.error('Error fetching patients:', error);
     res.json({ 
-      success: true, 
+      success: false, 
+      message: 'Error fetching patients',
       data: [] 
     });
   }

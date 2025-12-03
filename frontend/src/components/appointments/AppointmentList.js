@@ -22,7 +22,9 @@ import {
 import { format } from 'date-fns';
 
 const getStatusColor = (status) => {
-  switch (status.toLowerCase()) {
+  if (!status) return 'default';
+  const s = String(status).toLowerCase();
+  switch (s) {
     case 'scheduled':
       return 'primary';
     case 'completed':
@@ -90,10 +92,16 @@ const AppointmentList = ({
                   <TableCell>{appointment.doctorName}</TableCell>
                   <TableCell>{appointment.department}</TableCell>
                   <TableCell>
-                    {format(new Date(appointment.date), 'MMM dd, yyyy')}
+                    {(() => {
+                      const d = appointment.date ? new Date(appointment.date) : null;
+                      return d && !isNaN(d) ? format(d, 'MMM dd, yyyy') : '-';
+                    })()}
                   </TableCell>
                   <TableCell>
-                    {format(new Date(appointment.time), 'HH:mm')}
+                    {(() => {
+                      const t = appointment.time ? new Date(appointment.time) : null;
+                      return t && !isNaN(t) ? format(t, 'HH:mm') : '-';
+                    })()}
                   </TableCell>
                   <TableCell>
                     <Chip
