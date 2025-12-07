@@ -5,7 +5,7 @@ import Layout from '../components/Layout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faUsers, faCalendarCheck, faBed, faUserMd, 
-  faChartLine, faDollarSign, faClipboardList, faArrowUp, faArrowDown
+  faChartLine, faDollarSign, faClipboardList, faArrowUp, faArrowDown, faSync
 } from '@fortawesome/free-solid-svg-icons';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -94,15 +94,22 @@ const Dashboard = () => {
     return () => (mounted = false);
   }, []);
 
-
-
   return (
     <Layout>
       <div className="max-w-7xl mx-auto">
         {/* Welcome Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
-          <p className="text-gray-600">Welcome back! Here's what's happening today.</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard Overview</h1>
+            <p className="text-gray-600">Welcome back! Here's what's happening today.</p>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="p-2 border rounded-full text-gray-700 hover:text-blue-600 transition-colors"
+            title="Refresh Dashboard"
+          >
+            <FontAwesomeIcon icon={faSync} />
+          </button>
         </div>
 
         {/* Stats Grid */}

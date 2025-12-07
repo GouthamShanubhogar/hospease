@@ -10,6 +10,9 @@ const Patients = () => {
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const [patients, setPatients] = useState([]);
   const [loadingPatients, setLoadingPatients] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   
   const [form, setForm] = useState({
     patientType: 'Outpatient',
@@ -22,11 +25,6 @@ const Patients = () => {
     emergencyContact: '',
     emergencyContactName: '',
     bloodGroup: '',
-    admission: '',
-    referring: '',
-    insurance: '',
-    insuranceProvider: '',
-    insuranceNumber: '',
     notes: ''
   });
 
@@ -84,7 +82,16 @@ const Patients = () => {
 
     setLoading(true);
     setErrors({});
-    setSuccess('');
+    setSuccess("");
+    // Frontend validation for required fields
+    const newErrors = {};
+    if (!form.patientName) newErrors.patientName = "Name is required";
+    if (!form.email) newErrors.email = "Email is required";
+    if (!form.contact) newErrors.contact = "Phone is required";
+    if (!form.dateOfBirth) newErrors.dateOfBirth = "Date of birth is required";
+    if (!form.gender) newErrors.gender = "Gender is required";
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
     try {
       const response = await api.post('/api/patients/register', {
@@ -98,9 +105,6 @@ const Patients = () => {
         emergency_contact: form.emergencyContact,
         emergency_contact_name: form.emergencyContactName,
         patient_type: form.patientType,
-        insurance_provider: form.insuranceProvider,
-        insurance_number: form.insuranceNumber,
-        referring_doctor: form.referring,
         notes: form.notes
       });
 
@@ -211,6 +215,13 @@ const Patients = () => {
       setLoading(false);
     }
   };
+
+  // Filter patients based on search term
+  const filteredPatients = patients.filter(p =>
+    (p.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+    (p.email?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+    (p.phone?.toLowerCase() || "").includes(searchTerm.toLowerCase())
+  );
 
   return (
     <Layout>
@@ -347,6 +358,7 @@ const Patients = () => {
                       type="date"
                       value={form.dateOfBirth}
                       onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })}
+                      max={new Date(Date.now() - 24*60*60*1000).toISOString().split('T')[0]}
                       className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.dateOfBirth ? 'border-red-500' : 'border-gray-300'
                       }`}
@@ -367,9 +379,9 @@ const Patients = () => {
                       }`}
                     >
                       <option value="">Select Gender</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
                     </select>
                     {errors.gender && <p className="text-red-500 text-sm mt-1">{errors.gender}</p>}
                   </div>
@@ -474,9 +486,19 @@ const Patients = () => {
 
         {/* Patients List */}
         <div className="bg-white rounded-lg shadow-lg">
-          <div className="bg-gray-50 p-4 rounded-t-lg border-b">
-            <h2 className="text-xl font-semibold text-gray-800">Registered Patients</h2>
-            <p className="text-gray-600 text-sm">Total: {patients.length} patients</p>
+          <div className="bg-gray-50 p-4 rounded-t-lg border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800">Registered Patients</h2>
+              <p className="text-gray-600 text-sm">Total: {patients.length} patients</p>
+            </div>
+            <input
+              type="text"
+              placeholder="Search patients..."
+              className="border px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{ minWidth: '220px' }}
+            />
           </div>
 
           <div className="p-4">
@@ -505,7 +527,7 @@ const Patients = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {patients.map((patient) => (
+                    {filteredPatients.slice((currentPage-1)*pageSize, currentPage*pageSize).map((patient) => (
                       <tr key={patient.id} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <div>
@@ -555,6 +577,20 @@ const Patients = () => {
                     ))}
                   </tbody>
                 </table>
+                {/* Pagination Controls */}
+                <div className="flex justify-end items-center mt-4 gap-2">
+                  <button
+                    onClick={() => setCurrentPage(currentPage-1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 border rounded-lg text-gray-700 disabled:opacity-50"
+                  >Prev</button>
+                  <span className="text-sm">Page {currentPage} of {Math.ceil(filteredPatients.length/pageSize)}</span>
+                  <button
+                    onClick={() => setCurrentPage(currentPage+1)}
+                    disabled={currentPage === Math.ceil(filteredPatients.length/pageSize)}
+                    className="px-3 py-1 border rounded-lg text-gray-700 disabled:opacity-50"
+                  >Next</button>
+                </div>
               </div>
             )}
           </div>
@@ -695,6 +731,7 @@ const Patients = () => {
                     name="dateOfBirth"
                     value={editForm.dateOfBirth}
                     onChange={handleEditFormChange}
+                    max={new Date(Date.now() - 24*60*60*1000).toISOString().split('T')[0]}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
@@ -709,10 +746,10 @@ const Patients = () => {
                     onChange={handleEditFormChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
                   </select>
                 </div>
 

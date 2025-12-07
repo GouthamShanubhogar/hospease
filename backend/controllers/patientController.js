@@ -98,14 +98,9 @@ export const createPatient = async (req, res) => {
       emergency_contact,
       emergency_contact_name,
       patient_type,
-      insurance_provider,
-      insurance_number,
-      referring_doctor,
-      notes,
-      estimated_cost,
-      payment_method
+      notes
     } = req.body;
-    
+    console.log('Incoming patient registration:', req.body);
     // Validate required fields
     if (!name || !email || !phone || !date_of_birth || !gender) {
       return res.status(400).json({ 
@@ -117,99 +112,54 @@ export const createPatient = async (req, res) => {
     // Check if email already exists
     const emailCheck = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (emailCheck.rows.length > 0) {
+      console.log('Email already registered:', email);
       return res.status(400).json({ success: false, message: 'Email already registered' });
     }
     
     // Generate a default password for patient (they can change it later)
-    const defaultPassword = await bcrypt.hash('patient123', 10);
-    
-    // Insert patient
-    const query = `
+    const defaultPasswordHash = await bcrypt.hash('patient123', 10);
+    // Insert user
+    const userQuery = `
       INSERT INTO users (
-        name, email, phone, password, role, created_at, updated_at
+        name, email, phone, password_hash, role, created_at, updated_at
       ) VALUES ($1, $2, $3, $4, 'patient', NOW(), NOW())
       RETURNING id, name, email, phone
     `;
     
-    const result = await pool.query(query, [name, email, phone, defaultPassword]);
-    const patientId = result.rows[0].id;
-    
-    // Create patient profile with additional details
-    try {
-      console.log('Creating patient profile for user ID:', patientId);
-      console.log('Profile data:', {
-        date_of_birth,
-        gender,
-        address,
-        blood_group,
-        emergency_contact,
-        emergency_contact_name,
-        patient_type,
-        insurance_provider,
-        insurance_number,
-        referring_doctor,
-        notes
-      });
-      
-      const profileQuery = `
-        INSERT INTO patient_profiles (
-          user_id, 
-          date_of_birth, 
-          gender, 
-          address, 
-          blood_group,
-          emergency_contact,
-          emergency_contact_name,
-          patient_type,
-          insurance_provider,
-          insurance_number,
-          referring_doctor,
-          medical_notes,
-          estimated_cost,
-          payment_method,
-          created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
-      `;
-      
-      const profileResult = await pool.query(profileQuery, [
-        patientId,
-        date_of_birth,
-        gender,
-        address || null,
-        blood_group || null,
-        emergency_contact || null,
-        emergency_contact_name || null,
-        patient_type || 'Outpatient',
-        insurance_provider || null,
-        insurance_number || null,
-        referring_doctor || null,
-        notes || null,
-        estimated_cost || 0,
-        payment_method || 'later'
-      ]);
-      
-      console.log('Profile created successfully:', profileResult.rowCount);
-    } catch (profileError) {
-      console.error('Patient profile creation error:', profileError);
-      console.log('Patient profile table does not exist, skipping profile creation:', profileError.message);
-    }
-    
+    const userResult = await pool.query(userQuery, [name, email, phone, defaultPasswordHash]);
+    const userId = userResult.rows[0].id;
+    console.log('User created with ID:', userId);
+    // Insert patient profile info into patients table
+    const patientQuery = `
+      INSERT INTO patients (
+        patient_name, email_address, phone_number, date_of_birth, gender, blood_group, address,
+        emergency_contact_name, emergency_contact_phone, additional_notes, patient_type, registration_date, status, created_at, updated_at, total_appointments
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), 'Active', NOW(), NOW(), 0)
+      RETURNING patient_id
+    `;
+    await pool.query(patientQuery, [
+      name,
+      email,
+      phone,
+      date_of_birth,
+      gender,
+      blood_group || null,
+      address || null,
+      emergency_contact_name || null,
+      emergency_contact || null,
+      notes || null,
+      patient_type || 'Outpatient'
+    ]);
     res.status(201).json({
       success: true,
       message: 'Patient registered successfully',
-      data: result.rows[0]
+      data: { id: userId, name, email, phone }
     });
   } catch (error) {
-    console.error('Error creating patient:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error creating patient', 
-      error: error.message 
-    });
+    console.error('Error in createPatient:', error);
+    res.status(500).json({ success: false, message: 'Internal server error', error: error.message, stack: error.stack });
   }
 };
-
-// Update patient
 export const updatePatient = async (req, res) => {
   try {
     const { id } = req.params;

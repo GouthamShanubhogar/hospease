@@ -64,7 +64,17 @@ const AppointmentForm = ({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(formData);
+      // Only send required fields
+      const payload = {
+        patientName: formData.patientName,
+        patientPhone: formData.patientPhone,
+        doctorId: formData.doctorId,
+        department: formData.department,
+        date: formData.date,
+        time: formData.time,
+        notes: formData.notes
+      };
+      onSubmit(payload);
     }
   };
 

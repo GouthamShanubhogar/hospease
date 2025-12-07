@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faForward, 
   faRedo, 
-  faUser, 
-  faPhone, 
   faClock,
   faTicket,
-  faPlay,
   faRefresh 
 } from '@fortawesome/free-solid-svg-icons';
 import api from '../../services/api';
@@ -18,13 +15,7 @@ const QueueManagement = ({ doctorId, onQueueUpdate }) => {
   const [advancing, setAdvancing] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  useEffect(() => {
-    if (doctorId) {
-      fetchQueue();
-    }
-  }, [doctorId]);
-
-  const fetchQueue = async () => {
+  const fetchQueue = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get(`/api/appointments/doctor/${doctorId}/current-token`);
@@ -36,7 +27,13 @@ const QueueManagement = ({ doctorId, onQueueUpdate }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [doctorId]);
+
+  useEffect(() => {
+    if (doctorId) {
+      fetchQueue();
+    }
+  }, [doctorId, fetchQueue]);
 
   const advanceToken = async () => {
     try {
@@ -134,7 +131,7 @@ const QueueManagement = ({ doctorId, onQueueUpdate }) => {
           <button
             onClick={advanceToken}
             disabled={advancing || !queue?.totalAppointments}
-            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
+            className="flex-1 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center"
           >
             {advancing ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -147,7 +144,7 @@ const QueueManagement = ({ doctorId, onQueueUpdate }) => {
           <button
             onClick={resetQueue}
             disabled={resetting}
-            className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center"
+            className="text-white py-3 px-4 rounded-lg font-medium transition-colors flex items-center"
             title="Reset Queue"
           >
             {resetting ? (
@@ -172,33 +169,19 @@ const QueueManagement = ({ doctorId, onQueueUpdate }) => {
               {queue.queue.slice(0, 10).map((appointment, index) => (
                 <div
                   key={appointment.appointment_id}
-                  className={`p-3 rounded-lg border ${
-                    appointment.token_number === queue.currentToken + 1
-                      ? 'border-green-300 bg-green-50'
-                      : appointment.token_number <= queue.currentToken
-                      ? 'border-gray-200 bg-gray-50 opacity-60'
-                      : 'border-blue-200 bg-blue-50'
-                  }`}
+                  className="p-3 rounded-lg border"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-3 ${
-                        appointment.token_number === queue.currentToken + 1
-                          ? 'bg-green-200 text-green-800'
-                          : appointment.token_number <= queue.currentToken
-                          ? 'bg-gray-200 text-gray-600'
-                          : 'bg-blue-200 text-blue-800'
-                      }`}>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-3">
                         {appointment.token_number}
                       </div>
                       <div>
-                        <div className="font-medium text-gray-900 flex items-center">
-                          <FontAwesomeIcon icon={faUser} className="mr-1 text-xs" />
+                        <div className="font-medium text-gray-900">
                           {appointment.patient_name}
                         </div>
                         {appointment.patient_phone && (
-                          <div className="text-sm text-gray-600 flex items-center">
-                            <FontAwesomeIcon icon={faPhone} className="mr-1 text-xs" />
+                          <div className="text-sm text-gray-600">
                             {appointment.patient_phone}
                           </div>
                         )}
@@ -209,13 +192,7 @@ const QueueManagement = ({ doctorId, onQueueUpdate }) => {
                       <div className="text-sm font-medium text-gray-700">
                         {appointment.appointment_time?.slice(0, 5)}
                       </div>
-                      <div className={`text-xs px-2 py-1 rounded-full ${
-                        appointment.token_number === queue.currentToken + 1
-                          ? 'bg-green-100 text-green-700'
-                          : appointment.token_number <= queue.currentToken
-                          ? 'bg-gray-100 text-gray-600'
-                          : 'bg-blue-100 text-blue-700'
-                      }`}>
+                      <div className="text-xs px-2 py-1 rounded-full">
                         {appointment.token_number === queue.currentToken + 1 ? 'Next' :
                          appointment.token_number <= queue.currentToken ? 'Done' : 'Waiting'}
                       </div>
@@ -227,6 +204,12 @@ const QueueManagement = ({ doctorId, onQueueUpdate }) => {
                       {appointment.reason}
                     </div>
                   )}
+
+                  <div className="flex gap-2 mt-3">
+                    <button className="py-2 px-4 border rounded-lg text-gray-700">Edit</button>
+                    <button className="py-2 px-4 border rounded-lg text-gray-700">Reschedule</button>
+                    <button className="py-2 px-4 border rounded-lg text-gray-700">Cancel</button>
+                  </div>
                 </div>
               ))}
             </div>

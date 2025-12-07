@@ -4,12 +4,11 @@ import Layout from '../components/Layout';
 import AppointmentStats from '../components/appointments/AppointmentStats';
 import QueueManagement from '../components/appointments/QueueManagement';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faTimes, faCalendarAlt, faClock, faUser, faStethoscope, faTrash, faCalendarCheck, faExclamationTriangle, faFileAlt, faChartBar, faList } from '@fortawesome/free-solid-svg-icons';
+import { faEdit, faTimes, faCalendarAlt, faClock, faUser, faStethoscope, faTrash, faCalendarCheck, faExclamationTriangle, faFileAlt } from '@fortawesome/free-solid-svg-icons';
 import api from '../services/api';
 
 const Appointments = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [patients, setPatients] = useState([]);
@@ -32,8 +31,7 @@ const Appointments = () => {
   const [success, setSuccess] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [appointmentToDelete, setAppointmentToDelete] = useState(null);
-  const [showStats, setShowStats] = useState(false);
-  const [showQueue, setShowQueue] = useState(false);
+  // Removed unused setShowStats and setShowQueue
   const [selectedDoctorForQueue, setSelectedDoctorForQueue] = useState('');
   const [reschedulingId, setReschedulingId] = useState(null);
   const [showRescheduleAlert, setShowRescheduleAlert] = useState(false);
@@ -41,6 +39,9 @@ const Appointments = () => {
   const [rescheduleToastVisible, setRescheduleToastVisible] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const dateInputRef = useRef(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 9;
 
   // Load appointments, doctors, and patients on mount
   useEffect(() => {
@@ -416,399 +417,143 @@ const Appointments = () => {
     return `${formattedHour}:${minutes} ${ampm}`;
   };
 
+  const filteredAppointments = appointments.filter(a =>
+    (a.patient_name && a.patient_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (a.doctor_name && a.doctor_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (a.reason && a.reason.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  // Card border color logic
+  const getCardBorder = (status) => {
+    if (status === 'confirmed') return 'border-green-500';
+    if (status === 'cancelled') return 'border-red-500';
+    if (status === 'booked') return 'border-yellow-500';
+    return 'border-gray-300';
+  };
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-black">Scheduled Appointments</h1>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowStats(!showStats)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                showStats 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              <FontAwesomeIcon icon={faChartBar} className="mr-2" />
-              Statistics
-            </button>
-            <button
-              onClick={() => setShowQueue(!showQueue)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                showQueue 
-                  ? 'bg-purple-600 text-white' 
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              <FontAwesomeIcon icon={faList} className="mr-2" />
-              Queue
-            </button>
-            <button
-              onClick={() => navigate('/patients')}
-              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600"
-            >
-              Register New Patient
-            </button>
-          </div>
-        </div>
-
         {/* Enhanced Alert Messages - Centered */}
         {(success || errors.submit) && (
           <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-            <div className={`max-w-md w-full mx-4 p-6 rounded-lg shadow-xl transform transition-all duration-300 ${
-              success ? 'bg-green-50 border-l-4 border-green-400' : 'bg-red-50 border-l-4 border-red-400'
-            }`}>
+            <div className={`max-w-md w-full mx-4 p-6 rounded-lg shadow-xl transform transition-all duration-300 ${success ? 'bg-green-50 border-l-4 border-green-400' : 'bg-red-50 border-l-4 border-red-400'}`}>
               <div className="flex items-center">
-                <div className={`flex-shrink-0 ${
-                  success ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  <FontAwesomeIcon 
-                    icon={success ? faCalendarCheck : faExclamationTriangle} 
-                    className="w-6 h-6" 
-                  />
-                </div>
+                <div className={`flex-shrink-0 ${success ? 'text-green-400' : 'text-red-400'}`}> <FontAwesomeIcon icon={success ? faCalendarCheck : faExclamationTriangle} className="w-6 h-6" /> </div>
                 <div className="ml-3">
-                  <h3 className={`text-sm font-medium ${
-                    success ? 'text-green-800' : 'text-red-800'
-                  }`}>
-                    {success ? 'Success' : 'Error'}
-                  </h3>
-                  <p className={`mt-1 text-sm ${
-                    success ? 'text-green-700' : 'text-red-700'
-                  }`}>
-                    {success || errors.submit}
-                  </p>
+                  <h3 className={`text-sm font-medium ${success ? 'text-green-800' : 'text-red-800'}`}>{success ? 'Success' : 'Error'}</h3>
+                  <p className={`mt-1 text-sm ${success ? 'text-green-700' : 'text-red-700'}`}>{success || errors.submit}</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setSuccess('');
-                    setErrors({ ...errors, submit: '' });
-                  }}
-                  className={`ml-auto -mx-1.5 -my-1.5 p-1.5 inline-flex h-8 w-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                    success 
-                      ? 'bg-green-50 text-green-500 hover:bg-green-100 focus:ring-green-600' 
-                      : 'bg-red-50 text-red-500 hover:bg-red-100 focus:ring-red-600'
-                  }`}
-                >
-                  <FontAwesomeIcon icon={faTimes} className="w-3 h-3" />
-                </button>
+                <button onClick={() => { setSuccess(''); setErrors({ ...errors, submit: '' }); }} className={`ml-auto -mx-1.5 -my-1.5 p-1.5 inline-flex h-8 w-8 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 ${success ? 'bg-green-50 text-green-500 hover:bg-green-100 focus:ring-green-600' : 'bg-red-50 text-red-500 hover:bg-red-100 focus:ring-red-600'}`}> <FontAwesomeIcon icon={faTimes} className="w-3 h-3" /> </button>
               </div>
             </div>
           </div>
         )}
-
-        {/* Vertical Appointment Form (top) */}
+        {/* Appointment Form */}
         <div className="max-w-3xl mx-auto mb-6">
           <div className="bg-white border border-gray-300 rounded-lg shadow-lg">
             <div className="bg-blue-600 text-white p-4 rounded-t-lg">
-              <h2 className="text-lg font-semibold">{editingId ? 'Edit Appointment' : 'Book New Appointment'}</h2>
+              <h2 className="text-lg font-semibold">{editingId ? (reschedulingId ? 'Reschedule Appointment' : 'Edit Appointment') : 'Book New Appointment'}</h2>
             </div>
-
             <div className="p-6">
-              {errors.submit && (
-                <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">{errors.submit}</div>
-              )}
-
+              {errors.submit && (<div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">{errors.submit}</div>)}
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Date Field */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Appointment Date *</label>
-                  <input
-                    type="date"
-                    ref={dateInputRef}
-                    value={form.date}
-                    onChange={(e) => setForm({ ...form, date: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
-                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.date ? 'border-red-500' : 'border-gray-300'}`}
-                    required
-                  />
-                  {errors.date && <p className="text-red-500 text-sm mt-1">{errors.date}</p>}
-                </div>
-
-                {/* Time Field */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Appointment Time *</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
-                      type="number"
-                      value={form.hour}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 12)) {
-                          setForm({ ...form, hour: value });
-                        }
-                      }}
-                      placeholder="Hour"
-                      min="1"
-                      max="12"
-                      className={`p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.time ? 'border-red-500' : 'border-gray-300'}`}
-                      required
-                    />
-                    <input
-                      type="number"
-                      value={form.minute}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || (parseInt(value) >= 0 && parseInt(value) <= 59)) {
-                          setForm({ ...form, minute: value });
-                        }
-                      }}
-                      onBlur={(e) => {
-                        const value = e.target.value;
-                        if (value !== '' && parseInt(value) >= 0 && parseInt(value) <= 59) {
-                          setForm({ ...form, minute: value.padStart(2, '0') });
-                        }
-                      }}
-                      placeholder="Min"
-                      min="0"
-                      max="59"
-                      className={`p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.time ? 'border-red-500' : 'border-gray-300'}`}
-                      required
-                    />
-                    <select
-                      value={form.ampm}
-                      onChange={(e) => setForm({ ...form, ampm: e.target.value })}
-                      className={`p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.time ? 'border-red-500' : 'border-gray-300'}`}
-                      required
-                    >
-                      <option value="AM">AM</option>
-                      <option value="PM">PM</option>
-                    </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input ref={dateInputRef} type="date" className="w-full border px-3 py-2 rounded-lg" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
+                    {errors.date && <div className="text-xs text-red-600 mt-1">{errors.date}</div>}
                   </div>
-                  {errors.time && <p className="text-red-500 text-sm mt-1">{errors.time}</p>}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                    <div className="flex gap-2">
+                      <input type="number" min="1" max="12" className="w-16 border px-2 py-2 rounded-lg" placeholder="Hour" value={form.hour} onChange={e => setForm({ ...form, hour: e.target.value })} required />
+                      <span className="self-center">:</span>
+                      <input type="number" min="0" max="59" className="w-16 border px-2 py-2 rounded-lg" placeholder="Min" value={form.minute} onChange={e => setForm({ ...form, minute: e.target.value })} required />
+                      <select className="border px-2 py-2 rounded-lg" value={form.ampm} onChange={e => setForm({ ...form, ampm: e.target.value })}>
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
+                    {errors.time && <div className="text-xs text-red-600 mt-1">{errors.time}</div>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Doctor</label>
+                    <select className="w-full border px-3 py-2 rounded-lg" value={form.doctor_id} onChange={e => setForm({ ...form, doctor_id: e.target.value })} required>
+                      <option value="">Select Doctor</option>
+                      {doctors.map(doc => (
+                        <option key={doc.doctor_id || doc.id} value={doc.doctor_id || doc.id}>{doc.name}</option>
+                      ))}
+                    </select>
+                    {errors.doctor_id && <div className="text-xs text-red-600 mt-1">{errors.doctor_id}</div>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Patient</label>
+                    <select className="w-full border px-3 py-2 rounded-lg" value={form.patient_id} onChange={e => setForm({ ...form, patient_id: e.target.value })} required>
+                      <option value="">Select Patient</option>
+                      {patients.map(pat => (
+                        <option key={pat.patient_id || pat.id} value={pat.patient_id || pat.id}>{pat.name || pat.patient_name}</option>
+                      ))}
+                    </select>
+                    {errors.patient_id && <div className="text-xs text-red-600 mt-1">{errors.patient_id}</div>}
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+                    <input type="text" className="w-full border px-3 py-2 rounded-lg" placeholder="Reason for appointment" value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })} />
+                  </div>
                 </div>
-
-                {/* Doctor Field */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Doctor *</label>
-                  <select
-                    value={form.doctor_id}
-                    onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}
-                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.doctor_id ? 'border-red-500' : 'border-gray-300'}`}
-                    required
-                  >
-                    <option value="">Select a doctor</option>
-                    {doctors.map((doctor) => (
-                      <option key={doctor.doctor_id || doctor.id} value={doctor.doctor_id || doctor.id}>{doctor.name} {doctor.specialization ? `- ${doctor.specialization}` : ''}</option>
-                    ))}
-                  </select>
-                  {errors.doctor_id && <p className="text-red-500 text-sm mt-1">{errors.doctor_id}</p>}
-                </div>
-
-                {/* Patient Field */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Select Patient *</label>
-                  <select
-                    value={form.patient_id}
-                    onChange={(e) => setForm({ ...form, patient_id: e.target.value })}
-                    className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.patient_id ? 'border-red-500' : 'border-gray-300'}`}
-                    required
-                  >
-                    <option value="">Select a patient</option>
-                    {patients.map((patient) => (
-                      <option key={patient.patient_id || patient.id} value={patient.patient_id || patient.id}>{patient.patient_name || patient.name} {patient.email_address || patient.email ? `(${patient.email_address || patient.email})` : ''}</option>
-                    ))}
-                  </select>
-                  {errors.patient_id && <p className="text-red-500 text-sm mt-1">{errors.patient_id}</p>}
-                </div>
-
-                {/* Reason Field */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Reason for Visit</label>
-                  <textarea
-                    value={form.reason}
-                    onChange={(e) => setForm({ ...form, reason: e.target.value })}
-                    placeholder="Describe the reason for this appointment"
-                    rows={3}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Submit Buttons */}
-                <div className="flex gap-3 mt-6">
-                  {editingId && (
-                    <button type="button" onClick={() => { setEditingId(null); setForm({ date: '', time: '', hour: '', minute: '', ampm: 'AM', doctor_id: '', patient_id: '', reason: '', status: 'booked' }); }} className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg">Cancel</button>
-                  )}
-                  <button type="submit" disabled={loading} className={`${editingId ? 'flex-1' : 'w-full'} bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2`}>
-                    {loading && (<div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>)}
-                    {loading ? 'Processing...' : editingId ? 'Update Appointment' : 'Book Appointment'}
+                <div className="mt-6 flex gap-3 justify-end">
+                  <button type="submit" disabled={loading} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
+                    {editingId ? (reschedulingId ? 'Update Appointment' : 'Save Changes') : 'Book Appointment'}
                   </button>
+                  {editingId && !reschedulingId && (
+                    <button type="button" onClick={() => { setEditingId(null); setForm({ date: '', time: '', hour: '', minute: '', ampm: 'AM', doctor_id: '', patient_id: '', reason: '', status: 'booked' }); }} className="bg-gray-200 text-gray-800 px-6 py-2 rounded-lg font-semibold hover:bg-gray-300 transition-colors">Cancel</button>
+                  )}
                 </div>
               </form>
             </div>
           </div>
         </div>
-
-        <div className="space-y-6">
-          {/* Statistics Component */}
-          {showStats && (
-            <AppointmentStats />
-          )}
-          
-          {/* Queue Management Component */}
-          {showQueue && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-1">
-                <div className="bg-white rounded-lg shadow p-4 mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Doctor for Queue
-                  </label>
-                  <select
-                    value={selectedDoctorForQueue}
-                    onChange={(e) => setSelectedDoctorForQueue(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select a doctor</option>
-                    {doctors.map((doctor) => (
-                      <option key={doctor.doctor_id || doctor.id} value={doctor.doctor_id || doctor.id}>
-                        {doctor.name} {doctor.specialization ? `- ${doctor.specialization}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="lg:col-span-2">
-                <QueueManagement 
-                  doctorId={selectedDoctorForQueue}
-                  onQueueUpdate={(data) => {
-                    // Refresh appointments when queue is updated
-                    fetchAppointments();
-                  }}
-                />
-              </div>
-            </div>
-          )}
-          {/* Appointments List */}
+        {/* Booked Appointments Title and Search Bar */}
+        <div className="flex items-center justify-between mb-6 mt-8">
+          <h2 className="text-xl font-bold text-black">Booked Appointments</h2>
+          <input type="text" placeholder="Search appointments..." className="border px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ minWidth: '220px' }} />
+        </div>
+        {/* Appointments List and Pagination wrapped in a parent div */}
+        <div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {appointments.length === 0 ? (
-              <div className="col-span-3 text-center py-12 text-gray-500">
-                No appointments scheduled yet. Book your first appointment!
-              </div>
+            {filteredAppointments.length === 0 ? (
+              <div className="col-span-3 text-center py-12 text-gray-500">No appointments scheduled yet. Book your first appointment!</div>
             ) : (
-              appointments.map((apt) => (
-                <div 
-                  key={apt.appointment_id} 
-                  id={`appointment-${apt.appointment_id}`}
-                  className={`bg-white border-2 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 ${
-                    apt.status === 'cancelled' ? 'border-red-200 opacity-75 bg-red-50' : 
-                    apt.status === 'confirmed' ? 'border-green-200 bg-green-50' :
-                    'border-blue-200 hover:border-blue-300'
-                  } ${highlightedId === apt.appointment_id ? 'ring-4 ring-blue-300' : ''}`}
-                >
-                  {/* Header with Doctor and Status */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center min-w-0 flex-1">
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                        <FontAwesomeIcon icon={faStethoscope} className="text-blue-600 text-lg" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="text-lg font-bold text-blue-700 truncate">
-                          {apt.doctor_name || 'Dr. Unknown'}
-                        </h3>
-                        {apt.token_number && (
-                          <div className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full inline-block mt-1 font-medium">
-                            Token #{apt.token_number}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {apt.status && (
-                      <span className={`text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wide flex-shrink-0 ml-2 ${
-                        apt.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                        apt.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {apt.status}
-                      </span>
-                    )}
+              filteredAppointments.slice((currentPage-1)*pageSize, currentPage*pageSize).map((apt) => (
+                <div key={apt.appointment_id} id={`appointment-${apt.appointment_id}`} className={`bg-white border-2 rounded-xl p-6 shadow hover:shadow-md transition-all duration-300 ${getCardBorder(apt.status)} ${highlightedId === apt.appointment_id ? 'ring-4 ring-blue-300' : ''}`}>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="font-bold text-lg text-gray-800">Token #{apt.token_number || apt.appointment_id}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${apt.status === 'confirmed' ? 'bg-green-100 text-green-700' : apt.status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{apt.status}</span>
                   </div>
-                  
-                  {/* Patient Info */}
-                  <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                    <div className="flex items-center">
-                      <FontAwesomeIcon icon={faUser} className="mr-3 text-gray-400 w-4 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-700">Patient</p>
-                        <p className="font-semibold text-gray-900 truncate">{apt.patient_name || 'Unknown'}</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Date & Time */}
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-blue-50 rounded-lg p-3">
-                      <div className="flex items-center">
-                        <FontAwesomeIcon icon={faCalendarAlt} className="mr-2 text-blue-500 flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-blue-600 font-medium">Date</p>
-                          <p className="text-sm font-bold text-blue-800 truncate">{formatDate(apt.appointment_date)}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-purple-50 rounded-lg p-3">
-                      <div className="flex items-center">
-                        <FontAwesomeIcon icon={faClock} className="mr-2 text-purple-500 flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-purple-600 font-medium">Time</p>
-                          <p className="text-sm font-bold text-purple-800 truncate">{formatTime(apt.appointment_time || apt.preferred_time)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Reason (if provided) */}
-                  {apt.reason && apt.reason !== 'General consultation' && (
-                    <div className="bg-gray-50 rounded-lg p-3 mb-4">
-                      <div className="flex items-start">
-                        <FontAwesomeIcon icon={faFileAlt} className="mr-2 text-gray-400 mt-1 flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-gray-600 font-medium mb-1">Reason</p>
-                          <p className="text-sm text-gray-800">{apt.reason}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Action Buttons */}
+                  <div className="mb-1 text-sm text-gray-600"><FontAwesomeIcon icon={faUser} className="mr-2 text-blue-500" />Patient: <span className="font-medium text-gray-900">{apt.patient_name}</span></div>
+                  <div className="mb-1 text-sm text-gray-600"><FontAwesomeIcon icon={faStethoscope} className="mr-2 text-green-500" />Doctor: <span className="font-medium text-gray-900">{apt.doctor_name}</span></div>
+                  <div className="mb-1 text-sm text-gray-600"><FontAwesomeIcon icon={faCalendarAlt} className="mr-2 text-purple-500" />Date: <span className="font-medium text-gray-900">{formatDate(apt.appointment_date || apt.date)}</span></div>
+                  <div className="mb-1 text-sm text-gray-600"><FontAwesomeIcon icon={faClock} className="mr-2 text-yellow-500" />Time: <span className="font-medium text-gray-900">{formatTime(apt.appointment_time || apt.preferred_time || apt.time)}</span></div>
+                  <div className="mb-1 text-sm text-gray-600"><FontAwesomeIcon icon={faFileAlt} className="mr-2 text-gray-500" />Reason: <span className="font-medium text-gray-900">{apt.reason}</span></div>
                   <div className="flex gap-2 mt-4">
-                    {apt.status !== 'cancelled' ? (
-                      <>
-                        <button 
-                          onClick={() => handleEdit(apt)}
-                          className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md"
-                        >
-                          <FontAwesomeIcon icon={faEdit} className="mr-2" /> Edit
-                        </button>
-                        <button 
-                          onClick={() => handleReschedule(apt)}
-                          className="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:from-purple-600 hover:to-purple-700 transition-all duration-200 shadow-md"
-                        >
-                          <FontAwesomeIcon icon={faCalendarAlt} className="mr-2" /> Reschedule
-                        </button>
-                        <button 
-                          onClick={() => handleCancel(apt.appointment_id)}
-                          className="flex-1 bg-gradient-to-r from-gray-400 to-gray-500 text-white py-2 px-4 rounded-lg text-sm font-medium hover:from-gray-500 hover:to-gray-600 transition-all duration-200 shadow-md"
-                        >
-                          <FontAwesomeIcon icon={faTimes} className="mr-2" /> Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button 
-                        onClick={() => handleDeleteClick(apt)}
-                        className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md"
-                      >
-                        <FontAwesomeIcon icon={faTrash} className="mr-2" /> Delete
-                      </button>
-                    )}
+                    <button onClick={() => handleEdit(apt)} className="px-3 py-1 border rounded-lg text-blue-700 font-medium hover:border-blue-500"><FontAwesomeIcon icon={faEdit} className="mr-1" /> Edit</button>
+                    <button onClick={() => handleReschedule(apt)} className="px-3 py-1 border rounded-lg text-purple-700 font-medium hover:border-purple-500"><FontAwesomeIcon icon={faCalendarCheck} className="mr-1" /> Reschedule</button>
+                    <button onClick={() => handleCancel(apt.appointment_id)} className="px-3 py-1 border rounded-lg text-yellow-700 font-medium hover:border-yellow-500"><FontAwesomeIcon icon={faTimes} className="mr-1" /> Cancel</button>
+                    <button onClick={() => handleDeleteClick(apt)} className="px-3 py-1 border rounded-lg text-red-700 font-medium hover:border-red-500"><FontAwesomeIcon icon={faTrash} className="mr-1" /> Delete</button>
                   </div>
                 </div>
               ))
             )}
           </div>
-
+          {/* Pagination Controls */}
+          <div className="flex justify-end items-center mt-4 gap-2">
+            <button onClick={() => setCurrentPage(currentPage-1)} disabled={currentPage === 1} className="px-3 py-1 border rounded-lg text-gray-700 disabled:opacity-50">Prev</button>
+            <span className="text-sm">Page {currentPage} of {Math.ceil(filteredAppointments.length/pageSize)}</span>
+            <button onClick={() => setCurrentPage(currentPage+1)} disabled={currentPage === Math.ceil(filteredAppointments.length/pageSize)} className="px-3 py-1 border rounded-lg text-gray-700 disabled:opacity-50">Next</button>
+          </div>
         </div>
-
+        {/* Modals and Toasts - ensure all are inside the main parent div */}
         {/* Delete Confirmation Modal */}
         {showDeleteModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -818,57 +563,25 @@ const Appointments = () => {
                   <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-600 text-2xl" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">Delete Appointment</h3>
-                <p className="text-gray-600 mb-6">
-                  Are you sure you want to delete this appointment? This action cannot be undone.
-                </p>
+                <p className="text-gray-600 mb-6">Are you sure you want to delete this appointment? This action cannot be undone.</p>
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowDeleteModal(false);
-                      setAppointmentToDelete(null);
-                    }}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={loading}
-                    className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-                  >
-                    {loading ? 'Deleting...' : 'Delete'}
-                  </button>
+                  <button onClick={() => { setShowDeleteModal(false); setAppointmentToDelete(null); }} className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors">Cancel</button>
+                  <button onClick={handleDelete} disabled={loading} className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50">{loading ? 'Deleting...' : 'Delete'}</button>
                 </div>
               </div>
             </div>
           </div>
         )}
-
         {/* Reschedule Confirmation Toast */}
         {rescheduleToastVisible && rescheduleToastId && (
           <div className="fixed bottom-6 right-6 z-50">
             <div className="bg-blue-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3">
               <div className="text-sm">Appointment rescheduled</div>
-              <button
-                onClick={() => {
-                  viewAppointment(rescheduleToastId);
-                  setRescheduleToastVisible(false);
-                }}
-                className="underline font-medium text-white text-sm"
-              >
-                View
-              </button>
-              <button
-                onClick={() => setRescheduleToastVisible(false)}
-                className="ml-2 text-white opacity-80"
-                aria-label="close"
-              >
-                ×
-              </button>
+              <button onClick={() => { viewAppointment(rescheduleToastId); setRescheduleToastVisible(false); }} className="underline font-medium text-white text-sm">View</button>
+              <button onClick={() => setRescheduleToastVisible(false)} className="ml-2 text-white opacity-80" aria-label="close">×</button>
             </div>
           </div>
         )}
-
         {/* Reschedule Instruction Modal */}
         {showRescheduleAlert && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -879,42 +592,11 @@ const Appointments = () => {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Reschedule Appointment</h3>
-                  <p className="text-gray-600 mt-2">
-                    Update the <span className="font-medium">Date</span> and <span className="font-medium">Time</span> in the edit form on the right,
-                    then click <span className="font-medium">Update Appointment</span> to save the new schedule.
-                  </p>
+                  <p className="text-gray-600 mt-2">Update the <span className="font-medium">Date</span> and <span className="font-medium">Time</span> in the edit form on the right, then click <span className="font-medium">Update Appointment</span> to save the new schedule.</p>
                   <p className="text-sm text-gray-500 mt-2">You can also modify doctor, patient, and reason from the same form.</p>
                   <div className="flex gap-3 mt-6">
-                    <button
-                      onClick={() => {
-                        setShowRescheduleAlert(false);
-                        setTimeout(() => dateInputRef.current?.focus(), 150);
-                      }}
-                      className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Proceed to Edit
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowRescheduleAlert(false);
-                        setReschedulingId(null);
-                        setEditingId(null);
-                        setForm({
-                          date: '',
-                          time: '',
-                          hour: '',
-                          minute: '',
-                          ampm: 'AM',
-                          doctor_id: '',
-                          patient_id: '',
-                          reason: '',
-                          status: 'booked'
-                        });
-                      }}
-                      className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors"
-                    >
-                      Cancel
-                    </button>
+                    <button onClick={() => { setShowRescheduleAlert(false); setTimeout(() => dateInputRef.current?.focus(), 150); }} className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">Proceed to Edit</button>
+                    <button onClick={() => { setShowRescheduleAlert(false); setReschedulingId(null); setEditingId(null); setForm({ date: '', time: '', hour: '', minute: '', ampm: 'AM', doctor_id: '', patient_id: '', reason: '', status: 'booked' }); }} className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">Cancel</button>
                   </div>
                 </div>
               </div>
@@ -924,6 +606,5 @@ const Appointments = () => {
       </div>
     </Layout>
   );
-};
-
+}
 export default Appointments;

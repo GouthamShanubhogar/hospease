@@ -14,7 +14,7 @@ export const getAllAppointments = async (req, res) => {
              d.specialty as specialization,
              a.token_number
       FROM appointments a
-      LEFT JOIN patients p ON a.patient_id = p.patient_id
+      LEFT JOIN patients p ON a.user_id = p.patient_id
       LEFT JOIN doctors d ON a.doctor_id = d.id
       WHERE 1=1
     `;
@@ -23,7 +23,7 @@ export const getAllAppointments = async (req, res) => {
     let paramIndex = 1;
     
     if (patient_id) {
-      query += ` AND a.patient_id = $${paramIndex++}`;
+      query += ` AND a.user_id = $${paramIndex++}`;
       params.push(patient_id);
     }
     
@@ -123,8 +123,6 @@ export const createAppointment = async (req, res) => {
     const {
       patient_id,
       doctor_id,
-      hospital_id,
-      department_id,
       appointment_date,
       appointment_time,
       preferred_time,
@@ -140,8 +138,7 @@ export const createAppointment = async (req, res) => {
     // Use preferred_time if appointment_time is not provided
     const time = appointment_time || preferred_time;
     
-    // Use default hospital_id if not provided
-    const finalHospitalId = hospital_id || null;
+    // hospital_id removed
     
     // Generate token number for the appointment
     // Get the highest token number for this doctor on this date
@@ -156,17 +153,15 @@ export const createAppointment = async (req, res) => {
     
     const query = `
       INSERT INTO appointments (
-        patient_id, doctor_id, hospital_id, department_id,
+        patient_id, doctor_id,
         appointment_date, appointment_time, token_number, reason, notes, status, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
       RETURNING *
     `;
     
     const result = await pool.query(query, [
       patient_id, 
       doctor_id, 
-      finalHospitalId, 
-      department_id || null,
       appointment_date, 
       time, 
       token_number, 
